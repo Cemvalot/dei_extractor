@@ -96,17 +96,33 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Complete Workflow
+
+```bash
+# 1. Activate virtual environment (if using one)
+source dei_env_new/bin/activate
+
+# 2. Extract data from PDF files
+python3 extract_dei_final.py --input "*.pdf"
+
+# 3. Filter by Εκαθαριστικός (optional)
+python3 filter_ekatharistikos.py
+
+# 4. Check results
+ls -la *.csv *.xlsx
+```
+
 ### Basic Usage
 
 ```bash
 # Process a single PDF file
-python extract_dei_final.py --input "invoice.pdf"
+python3 extract_dei_final.py --input "invoice.pdf"
 
 # Process multiple PDF files using glob pattern
-python extract_dei_final.py --input "*.pdf"
+python3 extract_dei_final.py --input "*.pdf"
 
 # Process files from specific directory
-python extract_dei_final.py --input "path/to/invoices/*.pdf"
+python3 extract_dei_final.py --input "path/to/invoices/*.pdf"
 ```
 
 ### Output Files
@@ -117,6 +133,18 @@ The script generates the following output files:
 2. **φoπ.csv/φoπ.xlsx**: Only residential (ΦΟΠ) invoices
 3. **επαγγελματικα.csv/επαγγελματικα.xlsx**: Only commercial (Επαγγελματικό) invoices
 4. **warnings.log**: Log file with warnings and errors
+
+### Filtering by Εκαθαριστικός
+
+To filter and keep only records where `Εκαθαριστικός = True`:
+
+```bash
+# Run the filter script after extraction
+python3 filter_ekatharistikos.py
+```
+
+This creates additional output files:
+- **filtered.csv/filtered.xlsx**: Only records with `Εκαθαριστικός = True`
 
 ### Testing
 

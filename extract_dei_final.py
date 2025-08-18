@@ -254,13 +254,17 @@ class DEIExtractorEnhanced:
         if not match:
             return None
         
+        # Combine Ονοματεπώνυμο and Διεύθυνση into a single field
+        name = match.group('name').strip()
+        address = match.group('addr').strip()
+        combined_name_address = f"{name} {address}".strip()
+        
         return {
             'ΑρΠαροχής': str(match.group('par')),
             'ΑρΛογαριασμού': str(match.group('log')),
             'ΗμΈκδοσης': match.group('issued'),
             'ΠερίοδοςΚατανάλωσης': match.group('period'),
-            'Ονοματεπώνυμο': match.group('name').strip(),
-            'Διεύθυνση': match.group('addr').strip(),
+            'Ονοματεπώνυμο_Διεύθυνση': combined_name_address,
             'Πόλη': match.group('city').strip()
         }
     
@@ -421,8 +425,7 @@ class DEIExtractorEnhanced:
             'ΑρΛογαριασμού': None,
             'ΗμΈκδοσης': None,
             'ΠερίοδοςΚατανάλωσης': None,
-            'Ονοματεπώνυμο': None,
-            'Διεύθυνση': None,
+            'Ονοματεπώνυμο_Διεύθυνση': None,
             'Πόλη': None,
             'Τελευταία': None,
             'Προηγούμενη': None,
@@ -556,7 +559,7 @@ class DEIExtractorEnhanced:
             return
         
         # Ensure all text columns are strings
-        text_columns = ['ΑρΠαροχής', 'ΑρΛογαριασμού', 'Ονοματεπώνυμο', 'Διεύθυνση', 'Πόλη', 
+        text_columns = ['ΑρΠαροχής', 'ΑρΛογαριασμού', 'Ονοματεπώνυμο_Διεύθυνση', 'Πόλη', 
                        'ΚατηγορίαΤιμολογίου', 'Υποκατηγορία', 'reason', 'source_file',
                        'ΚατάστημαΕξυπηρέτησης', 'Παραστατικό', 'date_from', 'date_to']
         for col in text_columns:

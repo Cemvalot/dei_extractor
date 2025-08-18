@@ -250,22 +250,68 @@ pip install -r requirements.txt
    )
    ```
 
-## Next Steps
+## Usage Instructions
 
-After successful installation:
+### Step 1: Extract Data from PDF Files
 
-1. **Read the README.md** for usage instructions
-2. **Test with your PDF files**:
-   ```bash
-   python3 extract_dei.py --input "your_invoices/*.pdf"
-   ```
-3. **Check output files**:
-   - `ολα.csv` / `ολα.xlsx` - All records
-   - `φoπ.csv` / `φoπ.xlsx` - Residential invoices
-   - `επαγγελματικα.csv` / `επαγγελματικα.xlsx` - Commercial invoices
-   - `warnings.log` - Log file with issues
+```bash
+# Activate virtual environment (if using one)
+source dei_env_new/bin/activate
 
-4. **Review records marked for review** in the console output
+# Process PDF files
+python3 extract_dei_final.py --input "your_invoices/*.pdf"
+
+# Example with specific file
+python3 extract_dei_final.py --input "4J05_2019-12-01-1 1.pdf"
+```
+
+### Step 2: Check Generated Output Files
+
+After processing, you'll get these files:
+- `ολα.csv` / `ολα.xlsx` - All records
+- `φoπ.csv` / `φoπ.xlsx` - Residential invoices (ΦΟΠ)
+- `επαγγελματικα.csv` / `επαγγελματικα.xlsx` - Commercial invoices
+- `warnings.log` - Log file with issues
+
+### Step 3: Filter by Εκαθαριστικός (Optional)
+
+To filter and keep only records where `Εκαθαριστικός = True`:
+
+```bash
+# Make sure virtual environment is activated
+source dei_env_new/bin/activate
+
+# Run the filter script
+python3 filter_ekatharistikos.py
+```
+
+This will create:
+- `filtered.csv` - Filtered data in CSV format
+- `filtered.xlsx` - Filtered data in Excel format
+
+### Step 4: Review Results
+
+Check the console output for:
+- Total records extracted
+- Records needing review (confidence < 90%)
+- Processing warnings
+- Filtering statistics
+
+## Complete Workflow Example
+
+```bash
+# 1. Activate environment
+source dei_env_new/bin/activate
+
+# 2. Extract data from PDFs
+python3 extract_dei_final.py --input "*.pdf"
+
+# 3. Filter by Εκαθαριστικός (optional)
+python3 filter_ekatharistikos.py
+
+# 4. Check results
+ls -la *.csv *.xlsx
+```
 
 ## Support
 
