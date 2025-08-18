@@ -60,7 +60,7 @@ warnings.filterwarnings('ignore')
 ROW1_PATTERN = re.compile(
     r"(?P<par>\d{10,11})\s+(?P<log>\d{9,12})\s+(?P<issued>\d{2}/\d{2}/\d{4})\s+"
     r"(?P<period>\d{2}\.\d{2}\.\d{4}-\d{2}\.\d{2}\.\d{4})\s+"
-    r"(?P<name>[^0-9]+?)\s{2,}(?P<addr>[^0-9]+?)\s{2,}(?P<city>[^0-9]+)$"
+    r"(?P<name>.+?)\s{2,}(?P<addr>.+?)\s{2,}(?P<city>.+)$"
 )
 
 # Enhanced ROW2 pattern to handle ΦΟΠ variations and wrap categories
@@ -570,7 +570,7 @@ class DEIExtractorEnhanced:
             df['ΑρΛογαριασμού'] = df['ΑρΛογαριασμού'].astype(str)
         
         # Drop internal/processing columns before writing output files
-        drop_cols = ["ΚατάστημαΕξυπηρέτησης", "Παραστατικό", "needs_review", "reason", "confidence"]
+        drop_cols = ["ΚατάστημαΕξυπηρέτησης", "Παραστατικό", "needs_review", "reason", "confidence", "date_from", "date_to"]
         
         # Create copies for output files
         df_output = df.copy()
