@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-DEI PDF Invoice Data Extractor - Final Version
+DEI PDF Invoice Data Extractor - Enhanced Version with Edge Cases
 
 This script extracts data from Greek DEI (Public Power Corporation) PDF invoices
-using a precise 3-row block structure parsing approach.
+using a precise 3-row block structure parsing approach with enhanced edge case handling.
 
 Features:
 - Extracts data from 1+ PDF files via CLI
@@ -11,6 +11,9 @@ Features:
 - Handles both text-based and scanned PDFs (OCR fallback)
 - Generates separate output files for all records, residential (ΦΟΠ), and commercial invoices
 - Implements 90% confidence threshold with review system
+- Enhanced edge case handling for ΦΟΠ variations, wrap categories, deduplication
+- Header/footer filtering and financial line exclusion
+- Additional fields: ΚατάστημαΕξυπηρέτησης, Παραστατικό, date parsing
 
 Installation:
 1. Install Tesseract OCR: brew install tesseract tesseract-lang (macOS)
@@ -21,7 +24,7 @@ Usage:
     python extract_dei_final.py --input "path_or_glob/*.pdf"
 
 Author: DEI Extractor Team
-Version: 2.0
+Version: 3.0 - Enhanced with Edge Cases
 """
 
 import argparse
@@ -53,25 +56,55 @@ logger = logging.getLogger(__name__)
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 
-# Compile regex patterns for the 3-row block structure
+# Enhanced regex patterns for the 3-row block structure
 ROW1_PATTERN = re.compile(
     r"(?P<par>\d{10,11})\s+(?P<log>\d{9,12})\s+(?P<issued>\d{2}/\d{2}/\d{4})\s+"
     r"(?P<period>\d{2}\.\d{2}\.\d{4}-\d{2}\.\d{2}\.\d{4})\s+"
-    r"(?P<name>.+?)\s{2,}(?P<addr>.+?)\s{2,}(?P<city>.+)$"
+    r"(?P<name>[^0-9]+?)\s{2,}(?P<addr>[^0-9]+?)\s{2,}(?P<city>[^0-9]+)$"
 )
 
-ROW2_PATTERN = re.compile(r"^(?P<code>ΦΟΠ|Γ\d+)\s+(?P<label>Τιμολόγιο|Επαγγελματικό)\b")
+# Enhanced ROW2 pattern to handle ΦΟΠ variations and wrap categories
+ROW2_PATTERN = re.compile(r"^(?P<code>ΦΟΠ|Φ\.Ο\.Π|Φ\s+Ο\s+Π|Γ\d+)\s+(?P<label>Τιμολόγιο|Επαγγελματικό)\b")
 
+# Enhanced ROW3 pattern with fallback options
 ROW3_PATTERN = re.compile(r"^Ημέρα\s+(?P<last>\d+)\s+(?P<prev>\d+)\s+(?P<soxv>\d+)\s+(?P<syn>\d+)\s*$")
+ROW3_FALLBACK_PATTERN = re.compile(r"^(?P<last>\d+)\s+(?P<prev>\d+)\s+(?P<soxv>\d+)\s+(?P<syn>\d+)\s*$")
+
+# Patterns for additional fields
+STORE_PATTERN = re.compile(r"ΚΑΤΑΣΤΗΜΑ\s+ΕΞΥΠΗΡ\.ΔΕΗ\s*:\s*(.+)")
+RECEIPT_PATTERN = re.compile(r"ΠΑΡΑΣΤ:\s*(\d+)")
+
+# Header/footer patterns to ignore
+HEADER_FOOTER_PATTERNS = [
+    re.compile(r"ΔΗΜΟΣΙΑ\s+ΕΠΙΧΕΙΡΗΣΗ\s+ΗΛΕΚΤΡΙΣΜΟΥ", re.IGNORECASE),
+    re.compile(r"ΗΜΕΡΟΛΟΓΙΟ\s+ΕΚΔΟΣΗΣ", re.IGNORECASE),
+    re.compile(r"ΚΩΔ\.ΠΟΛΛΑΠΛΟΥ", re.IGNORECASE),
+    re.compile(r"ΚΩΔ\.ΕΤΑΙΡΟΥ", re.IGNORECASE),
+    re.compile(r"ΟΝΟΜΑ\s+ΔΗΜΟΥ", re.IGNORECASE),
+    re.compile(r"ΑΦΜ", re.IGNORECASE),
+    re.compile(r"ΣΕΛΙΔΑ", re.IGNORECASE),
+]
+
+# Financial patterns to exclude
+FINANCIAL_PATTERNS = [
+    re.compile(r"ΦΠΑ", re.IGNORECASE),
+    re.compile(r"ΡΥΘΜΙΖΟΜΕΝΕΣ\s+ΧΡΕΩΣΕΙΣ", re.IGNORECASE),
+    re.compile(r"ΧΡΕΩΣΕΙΣ\s+ΠΡΟΜΗΘΕΙΑΣ\s+ΔΕΗ", re.IGNORECASE),
+    re.compile(r"ΤΡΕΧΩΝ\s+ΜΗΝΑΣ", re.IGNORECASE),
+]
+
+# Pattern to exclude summary blocks
+SUMMARY_PATTERN = re.compile(r"Σ\s+Υ\s+Ν\s+Ο\s+Λ\s+Α\s+Π\s+Ο\s+Λ\s+Λ\s+Α\s+Π\s+Λ\s+Ο\s+Υ", re.IGNORECASE)
 
 
-class DEIExtractorFinal:
-    """Final version of DEI extractor with precise 3-row block parsing."""
+class DEIExtractorEnhanced:
+    """Enhanced version of DEI extractor with comprehensive edge case handling."""
     
     def __init__(self):
         self.records = []
         self.needs_review = []
         self.warnings = []
+        self.processed_blocks = set()  # For deduplication
         
     def fix_duplicated_chars(self, text: str) -> str:
         """Fix duplicated characters in the text (common in this PDF format)."""
@@ -91,6 +124,26 @@ class DEIExtractorFinal:
         
         return fixed_text
     
+    def should_ignore_line(self, line: str) -> bool:
+        """Check if a line should be ignored (headers, footers, financial lines)."""
+        line_upper = line.upper()
+        
+        # Check header/footer patterns
+        for pattern in HEADER_FOOTER_PATTERNS:
+            if pattern.search(line_upper):
+                return True
+        
+        # Check financial patterns
+        for pattern in FINANCIAL_PATTERNS:
+            if pattern.search(line_upper):
+                return True
+        
+        # Check summary pattern
+        if SUMMARY_PATTERN.search(line_upper):
+            return True
+        
+        return False
+    
     def extract_text_from_pdf(self, pdf_path: str) -> List[str]:
         """Extract text from PDF using pdfplumber with OCR fallback."""
         try:
@@ -104,14 +157,18 @@ class DEIExtractorFinal:
                     if text and len(text.strip()) > 50:
                         # Fix duplicated characters
                         text = self.fix_duplicated_chars(text)
-                        text_lines.extend(text.split('\n'))
+                        # Filter out ignored lines
+                        filtered_lines = [line for line in text.split('\n') 
+                                        if not self.should_ignore_line(line)]
+                        text_lines.extend(filtered_lines)
                     else:
                         # Fallback to OCR
                         logger.info(f"Using OCR for page {page_num + 1} in {pdf_path}")
                         ocr_lines = self._ocr_page(page, pdf_path, page_num)
                         for line in ocr_lines:
                             fixed_line = self.fix_duplicated_chars(line)
-                            text_lines.append(fixed_line)
+                            if not self.should_ignore_line(fixed_line):
+                                text_lines.append(fixed_line)
                 
                 return text_lines
                 
@@ -146,8 +203,29 @@ class DEIExtractorFinal:
         line = re.sub(r'\s+', '  ', line.strip())
         return line
     
+    def find_wrap_category(self, lines: List[str], current_index: int) -> Optional[str]:
+        """Find wrap category (Γ\\d+ followed by 'Επαγγελματικό' in next 1-2 lines)."""
+        if current_index + 1 >= len(lines):
+            return None
+        
+        # Check current line for Γ\d+ pattern
+        current_line = self.normalize_line(lines[current_index])
+        gamma_match = re.match(r"^(Γ\d+)\s+(.+)$", current_line)
+        
+        if not gamma_match:
+            return None
+        
+        # Check next 1-2 lines for "Επαγγελματικό"
+        for i in range(1, 3):
+            if current_index + i < len(lines):
+                next_line = self.normalize_line(lines[current_index + i])
+                if "Επαγγελματικό" in next_line:
+                    return "Επαγγελματικό"
+        
+        return None
+    
     def find_record_blocks(self, lines: List[str]) -> List[List[str]]:
-        """Find 3-row record blocks in the text lines."""
+        """Find 3-row record blocks in the text lines with enhanced detection."""
         blocks = []
         i = 0
         
@@ -160,8 +238,8 @@ class DEIExtractorFinal:
                     line2 = self.normalize_line(lines[i + 1])
                     line3 = self.normalize_line(lines[i + 2])
                     
-                    # Check if line2 matches category pattern
-                    if ROW2_PATTERN.match(line2):
+                    # Check if line2 matches category pattern or wrap category
+                    if ROW2_PATTERN.match(line2) or self.find_wrap_category(lines, i + 1):
                         blocks.append([line1, line2, line3])
                         i += 3  # Skip to next potential block
                         continue
@@ -187,7 +265,7 @@ class DEIExtractorFinal:
         }
     
     def parse_row2(self, line: str) -> Optional[Dict]:
-        """Parse ROW2 containing invoice category."""
+        """Parse ROW2 containing invoice category with ΦΟΠ variations."""
         match = ROW2_PATTERN.match(line)
         if not match:
             return None
@@ -195,8 +273,12 @@ class DEIExtractorFinal:
         code = match.group('code')
         label = match.group('label')
         
-        # Determine category based on code and label
-        if code == 'ΦΟΠ' or label == 'Τιμολόγιο':
+        # Normalize ΦΟΠ variations to "ΦΟΠ"
+        if code in ['ΦΟΠ', 'Φ.Ο.Π', 'Φ Ο Π']:
+            category = 'ΦΟΠ'
+        elif code.startswith('Γ') and label == 'Επαγγελματικό':
+            category = 'Επαγγελματικό'
+        elif label == 'Τιμολόγιο':
             category = 'ΦΟΠ'
         else:
             category = 'Επαγγελματικό'
@@ -208,17 +290,68 @@ class DEIExtractorFinal:
         }
     
     def parse_row3(self, line: str) -> Optional[Dict]:
-        """Parse ROW3 containing meter readings."""
+        """Parse ROW3 containing meter readings with fallback patterns."""
+        # Try primary pattern first
         match = ROW3_PATTERN.match(line)
-        if not match:
-            return None
+        if match:
+            return {
+                'Τελευταία': int(match.group('last')),
+                'Προηγούμενη': int(match.group('prev')),
+                'ΣΩΧΒ': int(match.group('soxv')),
+                'ΣυνΩΧΒ': int(match.group('syn'))
+            }
         
-        return {
-            'Τελευταία': int(match.group('last')),
-            'Προηγούμενη': int(match.group('prev')),
-            'ΣΩΧΒ': int(match.group('soxv')),
-            'ΣυνΩΧΒ': int(match.group('syn'))
-        }
+        # Try fallback pattern
+        match = ROW3_FALLBACK_PATTERN.match(line)
+        if match:
+            return {
+                'Τελευταία': int(match.group('last')),
+                'Προηγούμενη': int(match.group('prev')),
+                'ΣΩΧΒ': int(match.group('soxv')),
+                'ΣυνΩΧΒ': int(match.group('syn'))
+            }
+        
+        return None
+    
+    def extract_additional_fields(self, lines: List[str]) -> Dict:
+        """Extract additional fields from the context."""
+        additional_fields = {}
+        
+        # Join all lines for searching
+        all_text = ' '.join(lines)
+        
+        # Extract store information
+        store_match = STORE_PATTERN.search(all_text)
+        if store_match:
+            additional_fields['ΚατάστημαΕξυπηρέτησης'] = store_match.group(1).strip()
+        
+        # Extract receipt number
+        receipt_match = RECEIPT_PATTERN.search(all_text)
+        if receipt_match:
+            additional_fields['Παραστατικό'] = receipt_match.group(1)
+        
+        return additional_fields
+    
+    def parse_period_dates(self, period_str: str) -> Tuple[Optional[str], Optional[str]]:
+        """Parse period string into date_from and date_to (YYYY-MM-DD format)."""
+        try:
+            # Expected format: DD.MM.YYYY-DD.MM.YYYY
+            if '-' in period_str:
+                start_part, end_part = period_str.split('-', 1)
+                
+                # Parse start date
+                start_date = datetime.strptime(start_part.strip(), '%d.%m.%Y')
+                date_from = start_date.strftime('%Y-%m-%d')
+                
+                # Parse end date
+                end_date = datetime.strptime(end_part.strip(), '%d.%m.%Y')
+                date_to = end_date.strftime('%Y-%m-%d')
+                
+                return date_from, date_to
+        except Exception as e:
+            logger.warning(f"Failed to parse period dates from '{period_str}': {e}")
+        
+        return None, None
     
     def infer_subcategory(self, category: str, soxvb: Optional[int], context: Optional[List[str]] = None) -> Optional[str]:
         """Infer subcategory for commercial invoices."""
@@ -257,6 +390,10 @@ class DEIExtractorFinal:
         
         return matches / total if total > 0 else 0.0
     
+    def create_deduplication_key(self, record: Dict) -> str:
+        """Create a unique key for deduplication."""
+        return f"{record.get('ΑρΠαροχής', '')}_{record.get('ΑρΛογαριασμού', '')}_{record.get('ΗμΈκδοσης', '')}_{record.get('ΠερίοδοςΚατανάλωσης', '')}"
+    
     def parse_block(self, lines: List[str], source: str) -> Optional[Dict]:
         """Parse a 3-row block into a structured record."""
         if len(lines) != 3:
@@ -266,6 +403,14 @@ class DEIExtractorFinal:
         row1_data = self.parse_row1(lines[0])
         row2_data = self.parse_row2(lines[1])
         row3_data = self.parse_row3(lines[2])
+        
+        # Handle wrap category detection
+        if not row2_data and self.find_wrap_category(lines, 1):
+            row2_data = {
+                'ΚατηγορίαΤιμολογίου': 'Επαγγελματικό',
+                'raw_code': 'Γ-wrap',
+                'raw_label': 'Επαγγελματικό'
+            }
         
         # Calculate confidence
         confidence = self.calculate_confidence(row1_data, row2_data, row3_data)
@@ -286,6 +431,10 @@ class DEIExtractorFinal:
             'ΚατηγορίαΤιμολογίου': None,
             'Υποκατηγορία': None,
             'Εκαθαριστικός': False,
+            'ΚατάστημαΕξυπηρέτησης': None,
+            'Παραστατικό': None,
+            'date_from': None,
+            'date_to': None,
             'needs_review': False,
             'reason': None,
             'confidence': confidence,
@@ -295,13 +444,23 @@ class DEIExtractorFinal:
         # Merge data from all rows
         if row1_data:
             record.update(row1_data)
+            # Parse period dates
+            if row1_data.get('ΠερίοδοςΚατανάλωσης'):
+                date_from, date_to = self.parse_period_dates(row1_data['ΠερίοδοςΚατανάλωσης'])
+                record['date_from'] = date_from
+                record['date_to'] = date_to
         
         if row2_data:
             record.update(row2_data)
         
         if row3_data:
             record.update(row3_data)
+            # Set Εκαθαριστικός=True even if Τελευταία == Προηγούμενη
             record['Εκαθαριστικός'] = True
+        
+        # Extract additional fields
+        additional_fields = self.extract_additional_fields(lines)
+        record.update(additional_fields)
         
         # Infer subcategory
         if record['ΚατηγορίαΤιμολογίου'] == 'Επαγγελματικό':
@@ -310,6 +469,14 @@ class DEIExtractorFinal:
                 record.get('ΣΩΧΒ'), 
                 lines
             )
+        
+        # Check for deduplication
+        dedup_key = self.create_deduplication_key(record)
+        if dedup_key in self.processed_blocks:
+            logger.info(f"Skipping duplicate record: {dedup_key}")
+            return None
+        
+        self.processed_blocks.add(dedup_key)
         
         # Check confidence threshold
         if confidence < 0.90:
@@ -390,7 +557,8 @@ class DEIExtractorFinal:
         
         # Ensure all text columns are strings
         text_columns = ['ΑρΠαροχής', 'ΑρΛογαριασμού', 'Ονοματεπώνυμο', 'Διεύθυνση', 'Πόλη', 
-                       'ΚατηγορίαΤιμολογίου', 'Υποκατηγορία', 'reason', 'source_file']
+                       'ΚατηγορίαΤιμολογίου', 'Υποκατηγορία', 'reason', 'source_file',
+                       'ΚατάστημαΕξυπηρέτησης', 'Παραστατικό', 'date_from', 'date_to']
         for col in text_columns:
             if col in df.columns:
                 df[col] = df[col].astype(str)
@@ -401,18 +569,30 @@ class DEIExtractorFinal:
         if 'ΑρΛογαριασμού' in df.columns:
             df['ΑρΛογαριασμού'] = df['ΑρΛογαριασμού'].astype(str)
         
+        # Drop internal/processing columns before writing output files
+        drop_cols = ["ΚατάστημαΕξυπηρέτησης", "Παραστατικό", "needs_review", "reason", "confidence"]
+        
+        # Create copies for output files
+        df_output = df.copy()
+        fop_df = df[df['ΚατηγορίαΤιμολογίου'] == 'ΦΟΠ'].copy()
+        epag_df = df[df['ΚατηγορίαΤιμολογίου'] == 'Επαγγελματικό'].copy()
+        
+        # Drop columns from all output DataFrames
+        for df_out in [df_output, fop_df, epag_df]:
+            for col in drop_cols:
+                if col in df_out.columns:
+                    df_out.drop(columns=col, inplace=True)
+        
         # Write all records
-        df.to_csv('ολα.csv', index=False, encoding='utf-8-sig')
-        df.to_excel('ολα.xlsx', index=False)
+        df_output.to_csv('ολα.csv', index=False, encoding='utf-8-sig')
+        df_output.to_excel('ολα.xlsx', index=False)
         
         # Write ΦΟΠ records
-        fop_df = df[df['ΚατηγορίαΤιμολογίου'] == 'ΦΟΠ'].copy()
         if not fop_df.empty:
             fop_df.to_csv('φoπ.csv', index=False, encoding='utf-8-sig')
             fop_df.to_excel('φoπ.xlsx', index=False)
         
         # Write Επαγγελματικό records
-        epag_df = df[df['ΚατηγορίαΤιμολογίου'] == 'Επαγγελματικό'].copy()
         if not epag_df.empty:
             epag_df.to_csv('επαγγελματικα.csv', index=False, encoding='utf-8-sig')
             epag_df.to_excel('επαγγελματικα.xlsx', index=False)
@@ -428,8 +608,8 @@ class DEIExtractorFinal:
 
 
 def main():
-    """Main function to run the final DEI extractor."""
-    parser = argparse.ArgumentParser(description='Final DEI invoice data extractor with 3-row block parsing')
+    """Main function to run the enhanced DEI extractor."""
+    parser = argparse.ArgumentParser(description='Enhanced DEI invoice data extractor with comprehensive edge case handling')
     parser.add_argument('--input', required=True, help='PDF file path or glob pattern')
     
     args = parser.parse_args()
@@ -449,7 +629,7 @@ def main():
     print(f"Found {len(pdf_files)} PDF file(s) to process")
     
     # Process files
-    extractor = DEIExtractorFinal()
+    extractor = DEIExtractorEnhanced()
     df = extractor.process_files(pdf_files)
     
     # Write outputs
@@ -457,11 +637,12 @@ def main():
     
     # Print summary
     print("\n" + "="*60)
-    print("PROCESSING SUMMARY")
+    print("ENHANCED PROCESSING SUMMARY")
     print("="*60)
     print(f"Total records extracted: {len(df)}")
     print(f"Records needing review: {len(extractor.needs_review)}")
     print(f"Parsing warnings: {len(extractor.warnings)}")
+    print(f"Duplicate records filtered: {len(extractor.processed_blocks) - len(df)}")
     
     if extractor.needs_review:
         print(f"\nRecords with confidence < 90%:")
@@ -475,6 +656,17 @@ def main():
         epag_count = len(df[df['ΚατηγορίαΤιμολογίου'] == 'Επαγγελματικό'])
         print(f"  - φoπ.csv / φoπ.xlsx ({fop_count} records)")
         print(f"  - επαγγελματικα.csv / επαγγελματικα.xlsx ({epag_count} records)")
+    
+    # Show new features
+    if not df.empty:
+        print(f"\nEnhanced Features Applied:")
+        print(f"  - ΦΟΠ variations normalized: {len(df[df['raw_code'].isin(['Φ.Ο.Π', 'Φ Ο Π'])])}")
+        print(f"  - Wrap categories detected: {len(df[df['raw_code'] == 'Γ-wrap'])}")
+        print(f"  - Additional fields extracted:")
+        store_count = len(df[df['ΚατάστημαΕξυπηρέτησης'].notna() & (df['ΚατάστημαΕξυπηρέτησης'] != 'None')])
+        receipt_count = len(df[df['Παραστατικό'].notna() & (df['Παραστατικό'] != 'None')])
+        print(f"    * ΚατάστημαΕξυπηρέτησης: {store_count}")
+        print(f"    * Παραστατικό: {receipt_count}")
 
 
 if __name__ == "__main__":

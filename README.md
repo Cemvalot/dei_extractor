@@ -1,6 +1,27 @@
-# DEI PDF Invoice Extractor
+# DEI PDF Invoice Extractor - Enhanced Version 3.0
 
-A robust Python script for extracting structured data from Greek DEI (electricity company) PDF invoices. The script supports both text-based PDFs and OCR fallback for scanned documents.
+A robust Python script for extracting structured data from Greek DEI (electricity company) PDF invoices with comprehensive edge case handling. The script supports both text-based PDFs and OCR fallback for scanned documents.
+
+## 🚀 Enhanced Features (Version 3.0)
+
+### Edge Case Handling
+- **ΦΟΠ Variations**: Recognizes `ΦΟΠ`, `Φ.Ο.Π`, `Φ Ο Π` and normalizes to "ΦΟΠ"
+- **Wrap Categories**: Detects Γ\d+ codes with "Επαγγελματικό" in following lines
+- **Header/Footer Filtering**: Automatically excludes common headers and footers
+- **Financial Line Exclusion**: Filters out ΦΠΑ, charges, and other financial data
+- **Summary Block Exclusion**: Ignores "Σ Υ Ν Ο Λ Α Π Ο Λ Λ Α Π Λ Ο Υ" blocks
+- **Deduplication**: Removes duplicate records based on key fields
+
+### Enhanced Parsing
+- **Improved ROW1 Regex**: Better handling of names, addresses, and cities with numbers
+- **ROW3 Fallback Patterns**: Multiple patterns for meter reading extraction
+- **Zero Consumption Handling**: Correctly marks Εκαθαριστικός=True even with zero consumption
+- **Additional Fields**: Extracts ΚατάστημαΕξυπηρέτησης, Παραστατικό, and parsed dates
+
+### Data Quality
+- **90% Confidence Threshold**: Records below threshold flagged for review
+- **Comprehensive Validation**: Multiple validation layers for data integrity
+- **Detailed Logging**: Extensive logging for troubleshooting and debugging
 
 ## Features
 
@@ -11,11 +32,13 @@ A robust Python script for extracting structured data from Greek DEI (electricit
 - **Multiple Output Formats**: Generates CSV and Excel files
 - **Validation**: Built-in data validation and confidence scoring
 - **Logging**: Comprehensive logging for troubleshooting
+- **Edge Case Handling**: Comprehensive handling of various PDF formats and edge cases
 
 ## Extracted Fields
 
 The script extracts the following fields from DEI invoices:
 
+### Core Fields
 - **ΑρΠαροχής**: Account number (10-11 digits)
 - **ΑρΛογαριασμού**: Account number (if present)
 - **ΗμΈκδοσης**: Issue date
@@ -30,6 +53,17 @@ The script extracts the following fields from DEI invoices:
 - **ΚατηγορίαΤιμολογίου**: Invoice category (ΦΟΠ or Επαγγελματικό)
 - **Υποκατηγορία**: Subcategory for commercial invoices
 - **Εκαθαριστικός**: Boolean flag for final readings
+
+### Enhanced Fields (New in v3.0)
+- **ΚατάστημαΕξυπηρέτησης**: Service store information
+- **Παραστατικό**: Receipt number
+- **date_from**: Start date of consumption period (YYYY-MM-DD)
+- **date_to**: End date of consumption period (YYYY-MM-DD)
+- **raw_code**: Original category code before normalization
+- **raw_label**: Original category label
+- **confidence**: Confidence score (0.0-1.0)
+- **needs_review**: Flag for records requiring manual review
+- **reason**: Explanation for low confidence or parsing issues
 
 ## Installation
 
@@ -66,13 +100,13 @@ pip install -r requirements.txt
 
 ```bash
 # Process a single PDF file
-python extract_dei.py --input "invoice.pdf"
+python extract_dei_final.py --input "invoice.pdf"
 
 # Process multiple PDF files using glob pattern
-python extract_dei.py --input "*.pdf"
+python extract_dei_final.py --input "*.pdf"
 
 # Process files from specific directory
-python extract_dei.py --input "path/to/invoices/*.pdf"
+python extract_dei_final.py --input "path/to/invoices/*.pdf"
 ```
 
 ### Output Files
@@ -86,18 +120,18 @@ The script generates the following output files:
 
 ### Testing
 
-Run the test suite to validate functionality:
+Run the comprehensive test suite to validate all enhanced features:
 
 ```bash
-python test_extractor.py
+python test_final_extractor.py
 ```
 
 ## Business Rules
 
 ### Invoice Categorization
 
-- **ΦΟΠ**: Residential invoices (appears as "ΦΟΠ Τιμολόγιο")
-- **Επαγγελματικό**: Commercial invoices (appears as "Γ21 Επαγγελματικό")
+- **ΦΟΠ**: Residential invoices (normalized from `ΦΟΠ`, `Φ.Ο.Π`, `Φ Ο Π`)
+- **Επαγγελματικό**: Commercial invoices (including wrap categories with Γ\d+)
 
 ### Commercial Subcategories
 
@@ -107,8 +141,51 @@ python test_extractor.py
 
 ### Εκαθαριστικός Flag
 
-- **True**: When a numeric value exists in the "Τελευτ." column
-- **False**: When no numeric value is found
+- **True**: When ROW3 data is present (even if Τελευταία == Προηγούμενη)
+- **False**: When no ROW3 data is found
+
+### Deduplication
+
+Records are considered duplicates if they share the same:
+- ΑρΠαροχής
+- ΑρΛογαριασμού  
+- ΗμΈκδοσης
+- ΠερίοδοςΚατανάλωσης
+
+## Enhanced Edge Cases
+
+### ΦΟΠ Variations
+The extractor automatically normalizes all ΦΟΠ variations:
+- `ΦΟΠ` → "ΦΟΠ"
+- `Φ.Ο.Π` → "ΦΟΠ"
+- `Φ Ο Π` → "ΦΟΠ"
+
+### Wrap Category Detection
+Detects cases where category information spans multiple lines:
+```
+Γ21
+Επαγγελματικό
+```
+→ Categorized as "Επαγγελματικό"
+
+### Header/Footer Filtering
+Automatically excludes common headers and footers:
+- ΔΗΜΟΣΙΑ ΕΠΙΧΕΙΡΗΣΗ ΗΛΕΚΤΡΙΣΜΟΥ
+- ΗΜΕΡΟΛΟΓΙΟ ΕΚΔΟΣΗΣ
+- ΚΩΔ.ΠΟΛΛΑΠΛΟΥ, ΚΩΔ.ΕΤΑΙΡΟΥ
+- ΟΝΟΜΑ ΔΗΜΟΥ, ΑΦΜ, ΣΕΛΙΔΑ
+
+### Financial Line Exclusion
+Filters out financial information:
+- ΦΠΑ
+- ΡΥΘΜΙΖΟΜΕΝΕΣ ΧΡΕΩΣΕΙΣ
+- ΧΡΕΩΣΕΙΣ ΠΡΟΜΗΘΕΙΑΣ ΔΕΗ
+- ΤΡΕΧΩΝ ΜΗΝΑΣ
+
+### Enhanced ROW3 Parsing
+Supports multiple meter reading formats:
+- Primary: `Ημέρα 1234 1230 1 1234`
+- Fallback: `1234 1230 1 1234`
 
 ## Technical Details
 
@@ -121,16 +198,35 @@ The script uses Tesseract with the following configuration:
 
 ### Text Processing
 
-1. **Normalization**: Removes extra whitespace, normalizes separators
-2. **Block Detection**: Identifies invoice blocks using header patterns
-3. **Regex Parsing**: Extracts structured data using pattern matching
-4. **Validation**: Validates extracted data against business rules
+1. **Line Filtering**: Removes headers, footers, and financial lines
+2. **Normalization**: Removes extra whitespace, normalizes separators
+3. **Block Detection**: Identifies invoice blocks using enhanced patterns
+4. **Regex Parsing**: Extracts structured data using multiple fallback patterns
+5. **Validation**: Validates extracted data against business rules
+6. **Deduplication**: Removes duplicate records based on composite keys
 
 ### Error Handling
 
 - **Low Confidence**: Records with <90% confidence are flagged for review
 - **OCR Failures**: Logged with detailed error information
 - **Missing Data**: Handled gracefully with None values
+- **Edge Cases**: Comprehensive handling of various PDF formats
+
+## Performance Improvements
+
+### Memory Efficiency
+- Deduplication using sets for O(1) lookup
+- Streaming text processing to avoid loading entire PDFs in memory
+
+### Processing Speed
+- Compiled regex patterns for faster matching
+- Early exit conditions for invalid blocks
+- Efficient line filtering
+
+### Accuracy Improvements
+- 90% confidence threshold with detailed reasoning
+- Multiple fallback patterns for robust parsing
+- Comprehensive edge case handling
 
 ## Troubleshooting
 
@@ -152,11 +248,22 @@ The script uses Tesseract with the following configuration:
    - Verify PDF format matches expected structure
    - Review records marked as "needs_review"
 
+4. **Duplicate records**
+   - Check deduplication logic in warnings.log
+   - Verify key fields are properly extracted
+
 ### Performance Tips
 
 - For large batches, process files in smaller groups
 - Ensure sufficient disk space for temporary OCR files
 - Monitor memory usage with very large PDFs
+
+### Debug Mode
+
+Enable detailed logging by modifying the logging level:
+```python
+logging.basicConfig(level=logging.DEBUG)
+```
 
 ## Development
 
@@ -164,11 +271,12 @@ The script uses Tesseract with the following configuration:
 
 ```
 dei_extractor/
-├── extract_dei.py          # Main extraction script
-├── test_extractor.py       # Test suite
-├── requirements.txt        # Python dependencies
-├── README.md              # This file
-└── sample_invoice.txt     # Sample data for testing
+├── extract_dei_final.py     # Enhanced main extraction script
+├── test_final_extractor.py  # Comprehensive test suite
+├── requirements.txt         # Python dependencies
+├── README.md               # This file
+├── ENHANCED_FEATURES.md    # Detailed feature documentation
+└── sample_invoice.txt      # Sample data for testing
 ```
 
 ### Adding New Patterns
@@ -176,7 +284,7 @@ dei_extractor/
 To add support for new invoice formats:
 
 1. Update regex patterns in parsing methods
-2. Add new test cases in `test_extractor.py`
+2. Add new test cases in `test_final_extractor.py`
 3. Update business rules if needed
 4. Test with sample data
 
@@ -187,6 +295,25 @@ To add support for new invoice formats:
 3. Add tests for new functionality
 4. Submit a pull request
 
+## Version History
+
+### Version 3.0 (Enhanced)
+- Added ΦΟΠ variations recognition
+- Implemented wrap category detection
+- Added header/footer filtering
+- Added financial line exclusion
+- Implemented deduplication system
+- Enhanced ROW1 and ROW3 regex patterns
+- Added additional fields extraction
+- Improved zero consumption handling
+- Added comprehensive test suite
+
+### Version 2.0 (Final)
+- Basic 3-row block parsing
+- OCR fallback support
+- Confidence scoring system
+- Multiple output formats
+
 ## License
 
 This project is provided as-is for educational and business use. Please ensure compliance with DEI's terms of service when using this tool.
@@ -194,7 +321,8 @@ This project is provided as-is for educational and business use. Please ensure c
 ## Support
 
 For issues and questions:
-1. Check the warnings.log file for detailed error information
-2. Review the test output for validation issues
-3. Ensure all dependencies are properly installed
-4. Verify PDF format matches expected structure
+1. Check the `warnings.log` file for detailed error messages
+2. Review the test output for specific feature validation
+3. Verify PDF format matches expected structure
+4. Ensure all dependencies are properly installed
+5. Consult `ENHANCED_FEATURES.md` for detailed feature documentation
