@@ -8,7 +8,7 @@ used in the DEI extraction process.
 
 import csv
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
