@@ -1,358 +1,516 @@
-# DEI PDF Invoice Extractor - Enhanced Version 3.0
+# DEI Extractor
 
-A robust Python script for extracting structured data from Greek DEI (electricity company) PDF invoices with comprehensive edge case handling. The script supports both text-based PDFs and OCR fallback for scanned documents.
+A comprehensive Python package for extracting and processing DEI (Public Power Corporation) PDF invoice data with advanced parsing, filtering, and data validation capabilities.
 
-## 🚀 Enhanced Features (Version 3.0)
-
-### Edge Case Handling
-- **ΦΟΠ Variations**: Recognizes `ΦΟΠ`, `Φ.Ο.Π`, `Φ Ο Π` and normalizes to "ΦΟΠ"
-- **Wrap Categories**: Detects Γ\d+ codes with "Επαγγελματικό" in following lines
-- **Header/Footer Filtering**: Automatically excludes common headers and footers
-- **Financial Line Exclusion**: Filters out ΦΠΑ, charges, and other financial data
-- **Summary Block Exclusion**: Ignores "Σ Υ Ν Ο Λ Α Π Ο Λ Λ Α Π Λ Ο Υ" blocks
-- **Deduplication**: Removes duplicate records based on key fields
-
-### Enhanced Parsing
-- **Improved ROW1 Regex**: Better handling of names, addresses, and cities with numbers
-- **ROW3 Fallback Patterns**: Multiple patterns for meter reading extraction
-- **Zero Consumption Handling**: Correctly marks Εκαθαριστικός=True even with zero consumption
-- **Additional Fields**: Extracts ΚατάστημαΕξυπηρέτησης, Παραστατικό, and parsed dates
-
-### Data Quality
-- **90% Confidence Threshold**: Records below threshold flagged for review
-- **Comprehensive Validation**: Multiple validation layers for data integrity
-- **Detailed Logging**: Extensive logging for troubleshooting and debugging
-
-## Features
-
-- **Multi-format Support**: Handles both text-based and scanned PDFs
-- **OCR Fallback**: Automatic OCR processing for scanned documents using Tesseract
-- **Smart Parsing**: Robust regex-based parsing with Greek language support
-- **Business Logic**: Implements DEI-specific business rules for invoice categorization
-- **Multiple Output Formats**: Generates CSV and Excel files
-- **Validation**: Built-in data validation and confidence scoring
-- **Logging**: Comprehensive logging for troubleshooting
-- **Edge Case Handling**: Comprehensive handling of various PDF formats and edge cases
-
-## Extracted Fields
-
-The script extracts the following fields from DEI invoices:
-
-### Core Fields
-- **ΑρΠαροχής**: Account number (10-11 digits)
-- **ΑρΛογαριασμού**: Account number (if present)
-- **ΗμΈκδοσης**: Issue date
-- **ΠερίοδοςΚατανάλωσης**: Consumption period
-- **Ονοματεπώνυμο**: Customer name
-- **Διεύθυνση**: Address
-- **Πόλη**: City
-- **Τελευταία**: Latest meter reading
-- **Προηγούμενη**: Previous meter reading
-- **ΣΩΧΒ**: Power factor
-- **ΣυνΩΧΒ**: Total power factor
-- **ΚατηγορίαΤιμολογίου**: Invoice category (ΦΟΠ or Επαγγελματικό)
-- **Υποκατηγορία**: Subcategory for commercial invoices
-- **Εκαθαριστικός**: Boolean flag for final readings
-
-### Enhanced Fields (New in v3.0)
-- **ΚατάστημαΕξυπηρέτησης**: Service store information
-- **Παραστατικό**: Receipt number
-- **date_from**: Start date of consumption period (YYYY-MM-DD)
-- **date_to**: End date of consumption period (YYYY-MM-DD)
-- **raw_code**: Original category code before normalization
-- **raw_label**: Original category label
-- **confidence**: Confidence score (0.0-1.0)
-- **needs_review**: Flag for records requiring manual review
-- **reason**: Explanation for low confidence or parsing issues
-
-## Installation
+## 🚀 Quick Start
 
 ### Prerequisites
 
-1. **Python 3.11+**
-2. **Tesseract OCR** (for scanned PDFs)
+1. **Install Tesseract OCR** (for scanned PDFs):
+   ```bash
+   # macOS
+   brew install tesseract tesseract-lang
 
-### Install Tesseract
+   # Ubuntu/Debian
+   sudo apt update && sudo apt install tesseract-ocr tesseract-ocr-ell
 
-#### macOS
-```bash
-brew install tesseract tesseract-lang
-```
+   # Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
+   ```
 
-#### Ubuntu/Debian
-```bash
-sudo apt update
-sudo apt install tesseract-ocr tesseract-ocr-ell
-```
+2. **Verify Tesseract**:
+   ```bash
+   tesseract --version
+   ```
 
-#### Windows
-Download from: https://github.com/UB-Mannheim/tesseract/wiki
-
-### Install Python Dependencies
+### Installation
 
 ```bash
-pip install -r requirements.txt
-```
+# 1. Navigate to project directory
+cd /Users/cemvalot/Desktop/dei_extractor
 
-## Usage
-
-### Complete Workflow
-
-```bash
-# 1. Activate virtual environment (if using one)
+# 2. Activate virtual environment
 source dei_env_new/bin/activate
 
-# 2. Extract data from PDF files
-python3 extract_dei_final.py --input "*.pdf"
+# 3. Install package
+pip install -e .
 
-# 3. Filter by Εκαθαριστικός (optional)
-python3 filter_ekatharistikos.py
+# 4. Verify installation
+dei-extract --help
+```
 
-# 4. Check results
+### Quick Start Commands
+
+#### Extract Data from PDFs:
+```bash
+# Basic extraction
+dei-extract --input "dei_extractor/data/*.pdf"
+
+# With custom options
+dei-extract --input "dei_extractor/data/*.pdf" \
+           --confidence 0.95 \
+           --log-level INFO
+
+# Process specific files
+dei-extract --input "path/to/invoices/*.pdf"
+```
+
+#### Filter Extracted Data:
+```bash
+# Basic filtering
+dei-filter --inputs ολα.csv,φoπ.csv,επαγγελματικα.csv
+
+# Custom output files
+dei-filter --inputs "*.csv" \
+          --out-csv filtered_data.csv \
+          --out-xlsx filtered_data.xlsx
+```
+
+#### Complete Workflow:
+```bash
+# 1. Extract data
+dei-extract --input "dei_extractor/data/*.pdf" --log-level INFO
+
+# 2. Check output files
 ls -la *.csv *.xlsx
+
+# 3. Filter data
+dei-filter --inputs "ολα.csv,φoπ.csv,επαγγελματικα.csv"
+
+# 4. View results
+head -5 filtered.csv
 ```
 
-### Basic Usage
+## 📊 API Usage
 
-```bash
-# Process a single PDF file
-python3 extract_dei_final.py --input "invoice.pdf"
+### Basic API Usage
 
-# Process multiple PDF files using glob pattern
-python3 extract_dei_final.py --input "*.pdf"
+```python
+from dei_extractor import DEIExtractorEnhanced, FilterEkatharistikos, Config
 
-# Process files from specific directory
-python3 extract_dei_final.py --input "path/to/invoices/*.pdf"
+# Configure extraction
+config = Config(
+    confidence_threshold=0.90,
+    enable_ocr=True,
+    sort_by_αρ_παροχής=True
+)
 
-source dei_env_new/bin/activate && python extract_dei_final.py --input "*.pdf" && python filter_ekatharistikos.py
+# Extract data from PDFs
+extractor = DEIExtractorEnhanced(config)
+df = extractor.process_files(["dei_extractor/data/*.pdf"])
+
+print(f"Extracted {len(df)} records")
+
+# Filter data
+filter_tool = FilterEkatharistikos()
+filtered_df = filter_tool.process_files(["ολα.csv", "φoπ.csv"])
+
+print(f"Filtered to {len(filtered_df)} records")
 ```
 
-### Output Files
+### Advanced API Usage
 
-The script generates the following output files:
+```python
+from dei_extractor import DEIExtractorEnhanced, FilterEkatharistikos, Config
+from pathlib import Path
 
-1. **ολα.csv/ολα.xlsx**: All extracted records
-2. **φoπ.csv/φoπ.xlsx**: Only residential (ΦΟΠ) invoices
-3. **επαγγελματικα.csv/επαγγελματικα.xlsx**: Only commercial (Επαγγελματικό) invoices
-4. **warnings.log**: Log file with warnings and errors
+# Custom configuration
+config = Config(
+    input_pattern="*.pdf",
+    output_dir=Path("./output"),
+    confidence_threshold=0.95,
+    enable_ocr=True,
+    enable_deduplication=True,
+    log_level="DEBUG"
+)
 
-### Filtering by Εκαθαριστικός
+# Create extractor with custom config
+extractor = DEIExtractorEnhanced(config)
 
-To filter and keep only records where `Εκαθαριστικός = True`:
+# Process files with detailed logging
+pdf_files = ["file1.pdf", "file2.pdf", "file3.pdf"]
+df = extractor.process_files(pdf_files)
 
-```bash
-# Run the filter script after extraction
-python3 filter_ekatharistikos.py
+# Access individual processing methods
+if not df.empty:
+    # Write outputs
+    extractor.write_outputs(df)
+
+    # Get specific categories
+    fop_df = df[df['ΚατηγορίαΤιμολογίου'] == 'ΦΟΠ']
+    epag_df = df[df['ΚατηγορίαΤιμολογίου'] == 'Επαγγελματικό']
+
+    print(f"ΦΟΠ records: {len(fop_df)}")
+    print(f"Επαγγελματικό records: {len(epag_df)}")
+
+# Advanced filtering
+filter_tool = FilterEkatharistikos(config)
+
+# Process multiple input files
+input_files = ["ολα.csv", "φoπ.csv", "επαγγελματικα.csv"]
+filtered_df = filter_tool.process_files(input_files)
+
+# Apply custom transformations
+if not filtered_df.empty:
+    # Remove duplicates
+    filtered_df = filter_tool.remove_duplicates(filtered_df)
+
+    # Parse dates
+    filtered_df = filter_tool.parse_dates(filtered_df)
+
+    # Drop sensitive columns
+    filtered_df = filter_tool.drop_afm_column(filtered_df)
+
+    # Write custom outputs
+    filter_tool.write_outputs(filtered_df, "custom_filtered.csv", "custom_filtered.xlsx")
 ```
 
-This creates additional output files:
-- **filtered.csv/filtered.xlsx**: Only records with `Εκαθαριστικός = True`
+### Configuration Management
 
-### Testing
+```python
+from dei_extractor import Config
+import os
 
-Run the comprehensive test suite to validate all enhanced features:
+# Environment-based configuration
+os.environ['DEI_CONFIDENCE_THRESHOLD'] = '0.95'
+os.environ['DEI_ENABLE_OCR'] = 'true'
+os.environ['DEI_LOG_LEVEL'] = 'DEBUG'
 
-```bash
-python test_final_extractor.py
+# Load configuration
+config = Config()
+
+print(f"Confidence threshold: {config.confidence_threshold}")
+print(f"OCR enabled: {config.enable_ocr}")
+print(f"Log level: {config.log_level}")
+
+# Custom configuration
+custom_config = Config(
+    confidence_threshold=0.98,
+    enable_ocr=False,
+    max_file_size_mb=50,
+    output_formats=["csv"],
+    encoding="utf-8"
+)
 ```
-
-## Business Rules
-
-### Invoice Categorization
-
-- **ΦΟΠ**: Residential invoices (normalized from `ΦΟΠ`, `Φ.Ο.Π`, `Φ Ο Π`)
-- **Επαγγελματικό**: Commercial invoices (including wrap categories with Γ\d+)
-
-### Commercial Subcategories
-
-- **Απλό επαγγελματικό**: When ΣΩΧΒ = 1
-- **Βιομηχανικό**: When ΣΩΧΒ > 1
-- **Αγροτικό**: When agricultural keywords are detected (optional)
-
-### Εκαθαριστικός Flag
-
-- **True**: When ROW3 data is present (even if Τελευταία == Προηγούμενη)
-- **False**: When no ROW3 data is found
-
-### Deduplication
-
-Records are considered duplicates if they share the same:
-- ΑρΠαροχής
-- ΑρΛογαριασμού  
-- ΗμΈκδοσης
-- ΠερίοδοςΚατανάλωσης
-
-## Enhanced Edge Cases
-
-### ΦΟΠ Variations
-The extractor automatically normalizes all ΦΟΠ variations:
-- `ΦΟΠ` → "ΦΟΠ"
-- `Φ.Ο.Π` → "ΦΟΠ"
-- `Φ Ο Π` → "ΦΟΠ"
-
-### Wrap Category Detection
-Detects cases where category information spans multiple lines:
-```
-Γ21
-Επαγγελματικό
-```
-→ Categorized as "Επαγγελματικό"
-
-### Header/Footer Filtering
-Automatically excludes common headers and footers:
-- ΔΗΜΟΣΙΑ ΕΠΙΧΕΙΡΗΣΗ ΗΛΕΚΤΡΙΣΜΟΥ
-- ΗΜΕΡΟΛΟΓΙΟ ΕΚΔΟΣΗΣ
-- ΚΩΔ.ΠΟΛΛΑΠΛΟΥ, ΚΩΔ.ΕΤΑΙΡΟΥ
-- ΟΝΟΜΑ ΔΗΜΟΥ, ΑΦΜ, ΣΕΛΙΔΑ
-
-### Financial Line Exclusion
-Filters out financial information:
-- ΦΠΑ
-- ΡΥΘΜΙΖΟΜΕΝΕΣ ΧΡΕΩΣΕΙΣ
-- ΧΡΕΩΣΕΙΣ ΠΡΟΜΗΘΕΙΑΣ ΔΕΗ
-- ΤΡΕΧΩΝ ΜΗΝΑΣ
-
-### Enhanced ROW3 Parsing
-Supports multiple meter reading formats:
-- Primary: `Ημέρα 1234 1230 1 1234`
-- Fallback: `1234 1230 1 1234`
-
-## Technical Details
-
-### OCR Configuration
-
-The script uses Tesseract with the following configuration:
-- Language: Greek + English (`ell+eng`)
-- Page segmentation mode: 6 (uniform block of text)
-- Automatic fallback when text extraction fails
-
-### Text Processing
-
-1. **Line Filtering**: Removes headers, footers, and financial lines
-2. **Normalization**: Removes extra whitespace, normalizes separators
-3. **Block Detection**: Identifies invoice blocks using enhanced patterns
-4. **Regex Parsing**: Extracts structured data using multiple fallback patterns
-5. **Validation**: Validates extracted data against business rules
-6. **Deduplication**: Removes duplicate records based on composite keys
 
 ### Error Handling
 
-- **Low Confidence**: Records with <90% confidence are flagged for review
-- **OCR Failures**: Logged with detailed error information
-- **Missing Data**: Handled gracefully with None values
-- **Edge Cases**: Comprehensive handling of various PDF formats
-
-## Performance Improvements
-
-### Memory Efficiency
-- Deduplication using sets for O(1) lookup
-- Streaming text processing to avoid loading entire PDFs in memory
-
-### Processing Speed
-- Compiled regex patterns for faster matching
-- Early exit conditions for invalid blocks
-- Efficient line filtering
-
-### Accuracy Improvements
-- 90% confidence threshold with detailed reasoning
-- Multiple fallback patterns for robust parsing
-- Comprehensive edge case handling
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Tesseract not found**
-   ```
-   Error: tesseract is not installed or not in PATH
-   ```
-   Solution: Install Tesseract and ensure it's in your system PATH
-
-2. **OCR quality issues**
-   - Ensure PDF pages are properly scanned
-   - Check that Greek language pack is installed
-   - Try adjusting image quality if possible
-
-3. **Parsing errors**
-   - Check warnings.log for detailed error information
-   - Verify PDF format matches expected structure
-   - Review records marked as "needs_review"
-
-4. **Duplicate records**
-   - Check deduplication logic in warnings.log
-   - Verify key fields are properly extracted
-
-### Performance Tips
-
-- For large batches, process files in smaller groups
-- Ensure sufficient disk space for temporary OCR files
-- Monitor memory usage with very large PDFs
-
-### Debug Mode
-
-Enable detailed logging by modifying the logging level:
 ```python
+from dei_extractor import DEIExtractorEnhanced, ValidationError
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+
+try:
+    extractor = DEIExtractorEnhanced()
+    df = extractor.process_files(["nonexistent.pdf"])
+except ValidationError as e:
+    print(f"Validation error: {e}")
+except Exception as e:
+    print(f"Processing error: {e}")
+    logging.error(f"Error details: {e}", exc_info=True)
+```
+
+## 🛠️ Development
+
+### Development Setup
+
+```bash
+# 1. Clone and setup
+cd /Users/cemvalot/Desktop/dei_extractor
+source dei_env_new/bin/activate
+
+# 2. Install with development dependencies
+pip install -e ".[dev,docs,test]"
+
+# 3. Install pre-commit hooks
+make pre-commit
+
+# 4. Verify setup
+make validate
+```
+
+### Development Commands
+
+#### Code Quality:
+```bash
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Type checking
+make type-check
+
+# All quality checks
+make dev-test
+```
+
+#### Testing:
+```bash
+# Run all tests
+make test
+
+# Run with coverage
+make test-cov
+
+# Run only fast tests
+make test-fast
+
+# Run specific test categories
+pytest dei_extractor/tests/ -m "unit"
+pytest dei_extractor/tests/ -m "integration"
+```
+
+#### Building and Distribution:
+```bash
+# Build package
+make build
+
+# Clean build artifacts
+make clean
+
+# Release checks
+make release-check
+```
+
+### Development Workflow
+
+```bash
+# 1. Complete development setup
+make setup
+
+# 2. Run development tests
+make dev-test
+
+# 3. Make changes to code...
+
+# 4. Format and check code
+make format
+make lint
+make type-check
+
+# 5. Run tests
+make test
+
+# 6. Build and test
+make build
+make validate
+```
+
+### Testing Examples
+
+#### Unit Testing:
+```python
+import pytest
+from dei_extractor import DEIExtractorEnhanced, Config
+
+def test_extractor_initialization():
+    config = Config(confidence_threshold=0.90)
+    extractor = DEIExtractorEnhanced(config)
+    assert extractor.config.confidence_threshold == 0.90
+
+def test_filter_processing():
+    from dei_extractor import FilterEkatharistikos
+    import pandas as pd
+
+    # Create test data
+    test_data = pd.DataFrame({
+        'ΑρΠαροχής': ['1234567890', '1234567891'],
+        'Εκαθαριστικός': ['True', 'False']
+    })
+
+    filter_tool = FilterEkatharistikos()
+    result = filter_tool.filter_ekatharistikos(test_data)
+
+    assert len(result) == 1  # Only True values should remain
+```
+
+#### Integration Testing:
+```python
+import pytest
+from dei_extractor import DEIExtractorEnhanced, FilterEkatharistikos
+
+def test_full_workflow():
+    # Test complete extraction and filtering workflow
+    extractor = DEIExtractorEnhanced()
+    filter_tool = FilterEkatharistikos()
+
+    # Process test files
+    df = extractor.process_files(["test_data/sample.pdf"])
+    assert not df.empty
+
+    # Filter results
+    filtered_df = filter_tool.process_files(["ολα.csv"])
+    assert len(filtered_df) <= len(df)
+```
+
+### Debugging
+
+#### Enable Debug Logging:
+```bash
+# Command line
+dei-extract --input "*.pdf" --log-level DEBUG
+
+# Python
+import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
-## Development
+#### Performance Profiling:
+```bash
+# Profile execution
+make profile
 
-### Project Structure
-
+# Memory usage
+python -c "
+import psutil
+import os
+process = psutil.Process(os.getpid())
+print(f'Memory usage: {process.memory_info().rss / 1024 / 1024:.2f} MB')
+"
 ```
-dei_extractor/
-├── extract_dei_final.py     # Enhanced main extraction script
-├── test_final_extractor.py  # Comprehensive test suite
-├── requirements.txt         # Python dependencies
-├── README.md               # This file
-├── ENHANCED_FEATURES.md    # Detailed feature documentation
-└── sample_invoice.txt      # Sample data for testing
+
+#### Common Debug Commands:
+```bash
+# Check dependencies
+make check-deps
+
+# Check OCR
+make check-ocr
+
+# Validate project structure
+make validate
+
+# View logs
+tail -f warnings.log
+
+# Clear logs
+make logs-clear
 ```
-
-### Adding New Patterns
-
-To add support for new invoice formats:
-
-1. Update regex patterns in parsing methods
-2. Add new test cases in `test_final_extractor.py`
-3. Update business rules if needed
-4. Test with sample data
 
 ### Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
+#### Code Style:
+- Follow PEP 8 guidelines
+- Use Black for code formatting
+- Use isort for import sorting
+- Add type hints to all functions
 
-## Version History
+#### Testing:
+- Write tests for new features
+- Maintain 100% test coverage
+- Include edge case testing
+- Add integration tests for workflows
 
-### Version 3.0 (Enhanced)
-- Added ΦΟΠ variations recognition
-- Implemented wrap category detection
-- Added header/footer filtering
-- Added financial line exclusion
-- Implemented deduplication system
-- Enhanced ROW1 and ROW3 regex patterns
-- Added additional fields extraction
-- Improved zero consumption handling
-- Added comprehensive test suite
+#### Documentation:
+- Update docstrings for new functions
+- Add examples to README
+- Update API documentation
+- Include usage examples
 
-### Version 2.0 (Final)
-- Basic 3-row block parsing
-- OCR fallback support
-- Confidence scoring system
-- Multiple output formats
+#### Git Workflow:
+```bash
+# 1. Create feature branch
+git checkout -b feature/new-feature
 
-## License
+# 2. Make changes and test
+make dev-test
 
-This project is provided as-is for educational and business use. Please ensure compliance with DEI's terms of service when using this tool.
+# 3. Commit with conventional messages
+git commit -m "feat: add new extraction feature"
 
-## Support
+# 4. Push and create pull request
+git push origin feature/new-feature
+```
 
-For issues and questions:
-1. Check the `warnings.log` file for detailed error messages
-2. Review the test output for specific feature validation
-3. Verify PDF format matches expected structure
-4. Ensure all dependencies are properly installed
-5. Consult `ENHANCED_FEATURES.md` for detailed feature documentation
+## 📈 Performance Tips
+
+### Optimization:
+```python
+# Use batch processing for large files
+config = Config(max_file_size_mb=100)
+
+# Disable OCR for text-based PDFs
+config = Config(enable_ocr=False)
+
+# Use specific output formats
+config = Config(output_formats=["csv"])
+```
+
+### Memory Management:
+```python
+# Process files in batches
+for batch in file_batches:
+    df = extractor.process_files(batch)
+    # Process batch results
+    del df  # Free memory
+```
+
+## 🎯 Expected Output
+
+### Files Generated:
+- `ολα.csv` / `ολα.xlsx` - All extracted records
+- `φoπ.csv` / `φoπ.xlsx` - Residential (ΦΟΠ) records only
+- `επαγγελματικα.csv` / `επαγγελματικα.xlsx` - Commercial records only
+- `warnings.log` - Processing log file
+
+### Sample Output:
+```csv
+ΑρΠαροχής,ΑρΛογαριασμού,ΗμΈκδοσης,ΠερίοδοςΚατανάλωσης,Ονοματεπώνυμο_Διεύθυνση,Πόλη,Τελευταία,Προηγούμενη,ΣΩΧΒ,ΣυνΩΧΒ,ΚατηγορίαΤιμολογίου,Υποκατηγορία,Εκαθαριστικός
+33240992101,1199969431,06/12/2019,31.10.2019-01.12.2019,ΔΗΜΟΣ ΤΡΙΠΟΛΗΣ,ΠΑΡ.ΑΣΤΡΟΣ,70000.0,70000.0,1.0,0.0,Επαγγελματικό,Απλό επαγγελματικό,True
+```
+
+## 🆘 Troubleshooting
+
+### Common Issues:
+
+#### 1. **"Command not found: dei-extract"**
+```bash
+# Reinstall package
+pip install -e .
+```
+
+#### 2. **"No PDF files found"**
+```bash
+# Check file existence
+ls -la *.pdf
+
+# Use absolute path
+dei-extract --input "/full/path/to/*.pdf"
+```
+
+#### 3. **OCR Issues**
+```bash
+# Check Tesseract
+tesseract --version
+
+# Test OCR manually
+tesseract test.pdf stdout -l ell+eng
+```
+
+#### 4. **Permission Errors**
+```bash
+# Fix permissions
+chmod 644 *.pdf
+```
+
+### Getting Help:
+```bash
+# View logs
+tail -f warnings.log
+
+# Run validation
+make validate
+
+# Check dependencies
+make check-deps
+
+# Test OCR
+make check-ocr
+```
+
+---
+
+**🎉 The DEI Extractor is now ready for production use with comprehensive documentation and development tools!**
