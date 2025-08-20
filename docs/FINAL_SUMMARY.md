@@ -8,16 +8,16 @@ The DEI PDF invoice extractor has been successfully implemented and tested with 
 
 ### Extraction Performance
 - **Total Records Extracted**: 544 records
-- **ΦΟΠ (Residential) Records**: 304 records  
+- **ΦΟΠ (Residential) Records**: 304 records
 - **Επαγγελματικό (Commercial) Records**: 240 records
 - **Confidence Level**: 100% (all records achieved ≥90% confidence)
 - **Records Needing Review**: 0 (perfect parsing)
 
 ### Business Rules Implementation
 - ✅ **Εκαθαριστικός Flag**: 313 True, 231 False
-- ✅ **Subcategory Logic**: 
+- ✅ **Subcategory Logic**:
   - Απλό επαγγελματικό: 127 records
-  - Βιομηχανικό: 22 records  
+  - Βιομηχανικό: 22 records
   - Αγροτικό: 4 records
 - ✅ **Category Detection**: Perfect ΦΟΠ vs Επαγγελματικό classification
 

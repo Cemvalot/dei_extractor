@@ -244,7 +244,7 @@ pip install -r requirements.txt
    ```python
    # In extract_dei.py, modify OCR configuration
    text = pytesseract.image_to_string(
-       images[0], 
+       images[0],
        lang='ell+eng',
        config='--psm 6 --oem 3'  # Try different PSM modes
    )
