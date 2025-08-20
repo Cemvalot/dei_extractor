@@ -123,6 +123,8 @@ python3 extract_dei_final.py --input "*.pdf"
 
 # Process files from specific directory
 python3 extract_dei_final.py --input "path/to/invoices/*.pdf"
+
+source dei_env_new/bin/activate && python extract_dei_final.py --input "*.pdf" && python filter_ekatharistikos.py
 ```
 
 ### Output Files

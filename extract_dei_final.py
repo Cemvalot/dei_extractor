@@ -540,6 +540,11 @@ class DEIExtractorEnhanced:
             records = self.parse_pdf(file_path)
             all_records.extend(records)
         
+        # Sort records by ΑρΠαροχής before creating DataFrame
+        if all_records:
+            all_records.sort(key=lambda x: str(x.get('ΑρΠαροχής', '')))
+            logger.info(f"Sorted {len(all_records)} records by ΑρΠαροχής")
+        
         # Convert to DataFrame
         df = pd.DataFrame(all_records)
         
@@ -585,6 +590,19 @@ class DEIExtractorEnhanced:
             for col in drop_cols:
                 if col in df_out.columns:
                     df_out.drop(columns=col, inplace=True)
+        
+        # Sort and group by ΑρΠαροχής for all DataFrames
+        if 'ΑρΠαροχής' in df_output.columns:
+            df_output = df_output.sort_values(by=['ΑρΠαροχής'])
+            logger.info(f"Sorted {len(df_output)} records by ΑρΠαροχής")
+        
+        if 'ΑρΠαροχής' in fop_df.columns and not fop_df.empty:
+            fop_df = fop_df.sort_values(by=['ΑρΠαροχής'])
+            logger.info(f"Sorted {len(fop_df)} ΦΟΠ records by ΑρΠαροχής")
+        
+        if 'ΑρΠαροχής' in epag_df.columns and not epag_df.empty:
+            epag_df = epag_df.sort_values(by=['ΑρΠαροχής'])
+            logger.info(f"Sorted {len(epag_df)} Επαγγελματικό records by ΑρΠαροχής")
         
         # Write all records
         df_output.to_csv('ολα.csv', index=False, encoding='utf-8-sig')

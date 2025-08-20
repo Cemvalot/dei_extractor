@@ -92,6 +92,11 @@ def read_input_files(input_files):
     combined_df = pd.concat(all_data, ignore_index=True)
     logging.info(f"Combined data: {len(combined_df)} rows from {len(found_files)} files")
     
+    # Sort by ΑρΠαροχής if the column exists
+    if "ΑρΠαροχής" in combined_df.columns:
+        combined_df = combined_df.sort_values(by=["ΑρΠαροχής"])
+        logging.info(f"Sorted combined data by ΑρΠαροχής")
+    
     return combined_df, found_files
 
 def filter_ekatharistikos(df):
@@ -119,6 +124,11 @@ def filter_ekatharistikos(df):
     
     logging.info(f"Filtered to {len(filtered_df)} rows (removed {removed_count})")
     
+    # Sort by ΑρΠαροχής after filtering
+    if "ΑρΠαροχής" in filtered_df.columns:
+        filtered_df = filtered_df.sort_values(by=["ΑρΠαροχής"])
+        logging.info(f"Sorted {len(filtered_df)} filtered records by ΑρΠαροχής")
+    
     return filtered_df
 
 def remove_duplicates(df):
@@ -136,6 +146,11 @@ def remove_duplicates(df):
         df = df.drop_duplicates(keep="first")
         removed_count = before_count - len(df)
         logging.info(f"Dropped {removed_count} duplicate rows (full row comparison)")
+    
+    # Re-sort by ΑρΠαροχής after removing duplicates
+    if "ΑρΠαροχής" in df.columns:
+        df = df.sort_values(by=["ΑρΠαροχής"])
+        logging.info(f"Re-sorted {len(df)} records by ΑρΠαροχής after deduplication")
     
     return df
 
@@ -164,6 +179,11 @@ def parse_dates(df):
 def write_output_files(df, out_csv, out_xlsx):
     """Write filtered data to CSV and Excel files."""
     try:
+        # Sort and group by ΑρΠαροχής if the column exists
+        if "ΑρΠαροχής" in df.columns:
+            df = df.sort_values(by=["ΑρΠαροχής"])
+            logging.info(f"Sorted {len(df)} records by ΑρΠαροχής")
+        
         # Write CSV with UTF-8 BOM
         df.to_csv(out_csv, index=False, encoding='utf-8-sig')
         logging.info(f"Wrote {out_csv} ({len(df)} rows)")
