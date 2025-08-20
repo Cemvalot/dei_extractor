@@ -7,6 +7,7 @@ including data filtering, validation, and processing capabilities.
 """
 
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 

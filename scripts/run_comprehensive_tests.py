@@ -5,6 +5,7 @@ Comprehensive test runner for DEI Extractor.
 This script runs all tests and provides detailed reporting on the test results.
 """
 
+import os
 import subprocess
 import sys
 import time
@@ -79,8 +80,14 @@ def run_individual_tests():
     print(f"{'='*80}")
 
     test_modules = [
-        ("test_extract_dei_final_comprehensive.py", "Extract DEI Final"),
-        ("test_filter_ekatharistikos_comprehensive.py", "Filter Ekatharistikos"),
+        (
+            "dei_extractor/tests/test_extract_dei_final_comprehensive.py",
+            "Extract DEI Final",
+        ),
+        (
+            "dei_extractor/tests/test_filter_ekatharistikos_comprehensive.py",
+            "Filter Ekatharistikos",
+        ),
     ]
 
     results = {}
