@@ -1,20 +1,20 @@
 # DEI Extractor Installation Guide
 
-This guide provides step-by-step instructions for installing and setting up the DEI PDF Invoice Extractor.
+Complete installation guide for the DEI PDF Invoice Extractor - a tool for extracting and processing Greek DEI electricity bill data from PDF files.
 
 ## Prerequisites
 
 ### System Requirements
 - **Operating System**: macOS, Linux (Ubuntu/Debian), or Windows
-- **Python**: Version 3.11 or higher
+- **Python**: Version 3.8 or higher (tested with 3.11+)
 - **Memory**: At least 4GB RAM (8GB recommended for large PDF processing)
 - **Storage**: At least 1GB free space for temporary files
 
 ### Required Software
 
-1. **Python 3.11+**
-2. **Tesseract OCR** (for scanned PDFs)
-3. **pip** (Python package manager)
+1. **Python 3.8+** with pip
+2. **Tesseract OCR** (for processing scanned PDFs)
+3. **Git** (for cloning the repository)
 
 ## Installation Steps
 
@@ -67,34 +67,37 @@ tesseract --version
 3. Add Tesseract to PATH environment variable
 4. Verify installation: `tesseract --version`
 
-### Step 3: Set Up Python Environment
+### Step 3: Clone and Set Up the Project
 
 ```bash
-# Create a virtual environment (recommended)
-python3 -m venv dei_extractor_env
+# Clone the repository (or navigate to existing project)
+cd dei_extractor
 
-# Activate the virtual environment
-# On macOS/Linux:
-source dei_extractor_env/bin/activate
+# Activate the existing virtual environment
+source dei_env_new/bin/activate
 
-# On Windows:
-# dei_extractor_env\Scripts\activate
+# Or create a new virtual environment if needed
+# python3 -m venv dei_env_new
+# source dei_env_new/bin/activate  # On macOS/Linux
+# dei_env_new\Scripts\activate     # On Windows
 ```
 
-### Step 4: Install Python Dependencies
+### Step 4: Install the Package
 
 ```bash
-# Install required packages
-pip install -r requirements.txt
+# Install the package in development mode
+pip install -e .
+
+# This will install all required dependencies automatically
 ```
 
 ### Step 5: Verify Installation
 
 ```bash
-# Test the core logic (no external dependencies required)
-python3 simple_test.py
+# Test the CLI command
+dei-extract --help
 
-# Expected output should show all tests passing
+# Expected output: usage instructions for the CLI
 ```
 
 ## Configuration
@@ -137,39 +140,31 @@ export LOG_LEVEL="DEBUG"
 
 ## Testing the Installation
 
-### 1. Run Core Logic Tests
+### 1. Test CLI Installation
 
 ```bash
-python3 simple_test.py
+# Verify the CLI is working
+dei-extract --help
+
+# Expected output: Help text with all command options
 ```
 
-Expected output:
-```
-DEI Extractor Core Logic Tests
-========================================
-Testing text normalization...
-✓ Text normalization test passed
-Testing invoice header detection...
-✓ Invoice header detection test passed
-...
-ALL TESTS COMPLETED
-```
-
-### 2. Create Sample PDF (Optional)
+### 2. Test with Sample Data (Optional)
 
 ```bash
-# Install reportlab for PDF creation
-pip install reportlab
+# If you have sample PDF files, test the extraction
+dei-extract --input "dei_extractor/data" --output-dir "test_output" --verbose
 
-# Create sample PDF
-python3 create_sample_pdf.py
+# This will process any PDFs in the test data directory
 ```
 
-### 3. Test with Sample PDF
+### 3. Run Project Tests (For Developers)
 
 ```bash
-# Process the sample PDF
-python3 extract_dei.py --input "sample_dei_invoice.pdf"
+# Run the test suite
+python -m pytest dei_extractor/tests/ -v
+
+# Expected output: All tests should pass
 ```
 
 ## Troubleshooting
@@ -255,62 +250,71 @@ pip install -r requirements.txt
 ### Step 1: Extract Data from PDF Files
 
 ```bash
-# Activate virtual environment (if using one)
+# Activate virtual environment
 source dei_env_new/bin/activate
 
-# Process PDF files
-python3 extract_dei_final.py --input "your_invoices/*.pdf"
+# Basic extraction - process all PDFs in a directory
+dei-extract --input "path/to/invoices" --output-dir "results"
 
-# Example with specific file
-python3 extract_dei_final.py --input "4J05_2019-12-01-1 1.pdf"
+# Using positional argument
+dei-extract "path/to/invoices" --output-dir "results"
+
+# With verbose logging
+dei-extract --input "path/to/invoices" --output-dir "results" --verbose
 ```
 
-### Step 2: Check Generated Output Files
-
-After processing, you'll get these files:
-- `ολα.csv` / `ολα.xlsx` - All records
-- `φoπ.csv` / `φoπ.xlsx` - Residential invoices (ΦΟΠ)
-- `επαγγελματικα.csv` / `επαγγελματικα.xlsx` - Commercial invoices
-- `warnings.log` - Log file with issues
-
-### Step 3: Filter by Εκαθαριστικός (Optional)
-
-To filter and keep only records where `Εκαθαριστικός = True`:
+### Step 2: Extract and Filter in One Step
 
 ```bash
-# Make sure virtual environment is activated
-source dei_env_new/bin/activate
-
-# Run the filter script
-python3 filter_ekatharistikos.py
+# Extract and filter for Εκαθαριστικός records
+dei-extract --input "path/to/invoices" --output-dir "results" --filter --verbose
 ```
 
-This will create:
-- `filtered.csv` - Filtered data in CSV format
-- `filtered.xlsx` - Filtered data in Excel format
+### Step 3: Check Generated Output Files
+
+After processing, you'll find these files in your output directory:
+
+**Standard Output:**
+- `ολα.csv` / `ολα.xlsx` - All extracted records
+- `φoπ.csv` / `φoπ.xlsx` - Residential invoices (ΦΟΠ)
+- `επαγγελματικα.csv` / `επαγγελματικα.xlsx` - Commercial invoices
+
+**With Filtering (--filter option):**
+- `filtered.csv` / `filtered.xlsx` - Εκαθαριστικός records only (no duplicates)
 
 ### Step 4: Review Results
 
-Check the console output for:
+The CLI provides detailed output including:
 - Total records extracted
-- Records needing review (confidence < 90%)
-- Processing warnings
-- Filtering statistics
+- Records by category (ΦΟΠ/Επαγγελματικό)
+- Filtering statistics (if using --filter)
+- Processing warnings and errors
 
-## Complete Workflow Example
+## Complete Workflow Examples
 
+### Basic Extraction
 ```bash
 # 1. Activate environment
 source dei_env_new/bin/activate
 
 # 2. Extract data from PDFs
-python3 extract_dei_final.py --input "*.pdf"
+dei-extract "invoices/" --output-dir "extracted_data" --verbose
 
-# 3. Filter by Εκαθαριστικός (optional)
-python3 filter_ekatharistikos.py
+# 3. Check results
+ls -la extracted_data/
+```
 
-# 4. Check results
-ls -la *.csv *.xlsx
+### Extract and Filter
+```bash
+# 1. Activate environment
+source dei_env_new/bin/activate
+
+# 2. Extract and filter in one command
+dei-extract "invoices/" --output-dir "filtered_data" --filter --verbose
+
+# 3. Check results
+ls -la filtered_data/
+head -5 filtered_data/filtered.csv
 ```
 
 ## Support
