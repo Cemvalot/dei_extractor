@@ -125,14 +125,16 @@ def apply_filtering(output_dir: Path) -> bool:
 
     try:
         # Use the filter's process_files method
-        result = filter_processor.process_files(
-            [str(csv_file) for csv_file in csv_files]
-        )
-        if result:
+        df = filter_processor.process_files([str(csv_file) for csv_file in csv_files])
+        if not df.empty:
+            # Write filtered output to the same directory
+            filter_processor.write_outputs(
+                df, str(output_dir / "filtered.csv"), str(output_dir / "filtered.xlsx")
+            )
             logging.info("Filtering completed successfully")
             return True
         else:
-            logging.warning("Filtering failed")
+            logging.warning("No records found after filtering")
             return False
     except Exception as e:
         logging.error(f"Error during filtering: {e}")

@@ -79,7 +79,14 @@ class FilterEkatharistikos(LoggerMixin):
             return df
 
         total_rows = len(df)
-        filtered_df = df[df["Εκαθαριστικός"].str.lower().isin(TRUE_SET)]
+
+        # Handle different data types in Εκαθαριστικός column
+        if df["Εκαθαριστικός"].dtype == bool:
+            # Boolean values - keep True values
+            filtered_df = df[df["Εκαθαριστικός"] == True]
+        else:
+            # String or mixed values - convert to string and check against TRUE_SET
+            filtered_df = df[df["Εκαθαριστικός"].astype(str).str.lower().isin(TRUE_SET)]
 
         removed_count = total_rows - len(filtered_df)
         self.logger.info(
