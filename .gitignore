@@ -172,6 +172,8 @@ test_data/
 output/
 temp/
 tmp/
+test_output*/
+logs/
 
 # OS-specific files
 .DS_Store
