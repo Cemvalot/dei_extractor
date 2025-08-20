@@ -32,7 +32,12 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "input_dir",
+        nargs="?",
         help="Directory containing PDF files to process",
+    )
+    parser.add_argument(
+        "--input",
+        help="Directory containing PDF files to process (alternative to positional argument)",
     )
     parser.add_argument(
         "--output-dir",
@@ -91,19 +96,20 @@ def process_pdfs(input_dir: str, output_dir: Path, config: Dict[str, Any]) -> bo
 
     logging.info(f"Found {len(pdf_files)} PDF files to process")
 
-    success_count = 0
-    for pdf_file in pdf_files:
-        try:
-            logging.info(f"Processing {pdf_file.name}")
-            # Use the correct method name and convert Path to string
-            result = extractor.extract_text_from_pdf(str(pdf_file))
-            if result:
-                success_count += 1
-        except Exception as e:
-            logging.error(f"Error processing {pdf_file.name}: {e}")
-
-    logging.info(f"Successfully processed {success_count}/{len(pdf_files)} files")
-    return success_count > 0
+    # Use the extractor's process_files method
+    try:
+        df = extractor.process_files([str(pdf_file) for pdf_file in pdf_files])
+        if not df.empty:
+            # Write outputs to the specified output directory
+            extractor.write_outputs(df, str(output_dir))
+            logging.info("PDF processing completed successfully")
+            return True
+        else:
+            logging.error("PDF processing failed - no data extracted")
+            return False
+    except Exception as e:
+        logging.error(f"Error during PDF processing: {e}")
+        return False
 
 
 def apply_filtering(output_dir: Path) -> bool:
@@ -117,27 +123,40 @@ def apply_filtering(output_dir: Path) -> bool:
 
     logging.info(f"Applying filtering to {len(csv_files)} CSV files")
 
-    for csv_file in csv_files:
-        try:
-            logging.info(f"Filtering {csv_file.name}")
-            # Use the correct method name
-            filter_processor.process_files([str(csv_file)])
-        except Exception as e:
-            logging.error(f"Error filtering {csv_file.name}: {e}")
-
-    return True
+    try:
+        # Use the filter's process_files method
+        result = filter_processor.process_files(
+            [str(csv_file) for csv_file in csv_files]
+        )
+        if result:
+            logging.info("Filtering completed successfully")
+            return True
+        else:
+            logging.warning("Filtering failed")
+            return False
+    except Exception as e:
+        logging.error(f"Error during filtering: {e}")
+        return False
 
 
 def main() -> None:
     """Main function to orchestrate the extraction and filtering process."""
     args = parse_arguments()
 
+    # Determine input directory
+    input_dir = args.input or args.input_dir
+    if not input_dir:
+        logging.error(
+            "Input directory is required. Use --input or provide as positional argument."
+        )
+        sys.exit(1)
+
     try:
         # Set up environment
         output_dir, config = setup_environment(args)
 
         # Process PDFs
-        success = process_pdfs(args.input_dir, output_dir, config)
+        success = process_pdfs(input_dir, output_dir, config)
         if not success:
             logging.error("PDF processing failed")
             sys.exit(1)

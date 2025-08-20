@@ -624,11 +624,15 @@ class DEIExtractorEnhanced(LoggerMixin):
 
         return df
 
-    def write_outputs(self, df: pd.DataFrame):
+    def write_outputs(self, df: pd.DataFrame, output_dir: str = "."):
         """Write output files in CSV and Excel formats."""
         if df.empty:
             logger.warning("No data to write")
             return
+
+        # Create output directory if it doesn't exist
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
 
         # Ensure all text columns are strings
         text_columns = [
@@ -698,24 +702,26 @@ class DEIExtractorEnhanced(LoggerMixin):
             logger.info(f"Sorted {len(epag_df)} Επαγγελματικό records by ΑρΠαροχής")
 
         # Write all records
-        df_output.to_csv("ολα.csv", index=False, encoding="utf-8-sig")
-        df_output.to_excel("ολα.xlsx", index=False)
+        df_output.to_csv(output_path / "ολα.csv", index=False, encoding="utf-8-sig")
+        df_output.to_excel(output_path / "ολα.xlsx", index=False)
 
         # Write ΦΟΠ records
         if not fop_df.empty:
-            fop_df.to_csv("φoπ.csv", index=False, encoding="utf-8-sig")
-            fop_df.to_excel("φoπ.xlsx", index=False)
+            fop_df.to_csv(output_path / "φoπ.csv", index=False, encoding="utf-8-sig")
+            fop_df.to_excel(output_path / "φoπ.xlsx", index=False)
 
         # Write Επαγγελματικό records
         if not epag_df.empty:
-            epag_df.to_csv("επαγγελματικα.csv", index=False, encoding="utf-8-sig")
-            epag_df.to_excel("επαγγελματικα.xlsx", index=False)
+            epag_df.to_csv(
+                output_path / "επαγγελματικα.csv", index=False, encoding="utf-8-sig"
+            )
+            epag_df.to_excel(output_path / "επαγγελματικα.xlsx", index=False)
 
         logger.info("Output files written successfully")
 
         # Write warnings to log
         if self.warnings:
-            with open("warnings.log", "a", encoding="utf-8") as f:
+            with open(output_path / "warnings.log", "a", encoding="utf-8") as f:
                 f.write(f"\n--- Processing completed at {datetime.now()} ---\n")
                 for warning in self.warnings:
                     f.write(f"WARNING: {warning}\n")
