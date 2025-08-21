@@ -139,14 +139,21 @@ class FilterEkatharistikos(LoggerMixin):
         """Parse ΗμΈκδοσης column to DD/MM/YYYY format if it exists."""
         if "ΗμΈκδοσης" in df.columns:
             try:
-                # Try to parse dates, but don't fail if parsing fails
-                df["ΗμΈκδοσης"] = pd.to_datetime(
-                    df["ΗμΈκδοσης"], format="%d/%m/%Y", errors="coerce"
-                )
+                # Create a copy of the original column for fallback
+                original_dates = df["ΗμΈκδοσης"].copy()
+
+                # Try to parse dates flexibly - let pandas infer the format
+                parsed_dates = pd.to_datetime(df["ΗμΈκδοσης"], errors="coerce")
+
                 # Convert back to string format DD/MM/YYYY for non-null values
-                df["ΗμΈκδοσης"] = (
-                    df["ΗμΈκδοσης"].dt.strftime("%d/%m/%Y").fillna(df["ΗμΈκδοσης"])
+                formatted_dates = parsed_dates.dt.strftime("%d/%m/%Y")
+
+                # Use formatted dates where available, otherwise keep original
+                # But ensure we don't have NaN values in the final result
+                df["ΗμΈκδοσης"] = formatted_dates.where(
+                    formatted_dates.notna(), original_dates
                 )
+
                 self.logger.info("Successfully parsed ΗμΈκδοσης dates")
             except Exception as e:
                 self.logger.warning(f"Could not parse ΗμΈκδοσης dates: {e}")

@@ -13,6 +13,7 @@ Extract structured data from DEI PDF invoices, categorize by billing type (ΦΟ�
 - 📊 **Multiple Formats**: Export to both CSV and Excel formats
 - 🛡️ **Data Validation**: Built-in validation and error handling
 - 📝 **Comprehensive Logging**: Detailed processing logs for troubleshooting
+- 🔄 **Multi-Layout Support**: Automatic detection and parsing of both modern and v2018 DEI layouts
 
 ## 🚀 Quick Start
 
@@ -201,6 +202,26 @@ The extracted data includes the following fields:
 | `ΚατηγορίαΤιμολογίου` | Billing category | Επαγγελματικό |
 | `Υποκατηγορία` | Billing subcategory | Απλό επαγγελματικό |
 | `Εκαθαριστικός` | Final settlement flag | True |
+
+## 📋 Supported Layouts
+
+The DEI Extractor supports automatic detection and parsing of two different DEI bill layouts:
+
+### Modern Layout
+- **Detection**: Standard DEI bill format with 3-row block structure
+- **Features**: Full support for all fields including meter readings, categories, and subcategories
+- **Compatibility**: Current DEI bill format
+
+### v2018 Layout (Older Format)
+- **Detection**: Identified by anchors like "Ο λογαριασμός σας συνοπτικά", "Κωδικός Ηλεκτρονικής Πληρωμής", "Κατανάλωση Ηλεκτρικής Ενέργειας"
+- **Features**: Extracts all available fields including:
+  - Supply number, issue date, consumption period
+  - kWh consumption, total amount, RF payment code
+  - Customer details, address, city
+  - Account type and category classification
+- **Compatibility**: Older DEI bill format from 2018 and earlier
+
+Both layouts return the same standardized field names, ensuring compatibility with existing filters, exports, and CLI functionality.
 
 ## 🔧 Development
 
