@@ -58,6 +58,9 @@ dei-extract --input "path/to/pdfs" --output-dir "results"
 
 # With verbose logging
 dei-extract --input "path/to/pdfs" --output-dir "results" --verbose
+
+# With verbose logging and filtering
+dei-extract --input "dei_extractor/data" --verbose --filter
 ```
 
 ### With Εκαθαριστικός Filtering
