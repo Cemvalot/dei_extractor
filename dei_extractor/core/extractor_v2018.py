@@ -294,12 +294,19 @@ class DEIV2018Extractor(LoggerMixin):
         document_no = _safe_search(r"Αρ\.\s+Παραστατικού\s*(\d+)", norm, re.IGNORECASE)
 
         # Meter readings (current, previous, difference)
-        meter_readings = re.search(r"(\d{5})\s+(\d{5})\s+(\d{4})", norm)
+        # Look for patterns like: 37170 36427 743 (5 digits, 5 digits, 3-4 digits)
+        meter_readings = re.search(r"(\d{5})\s+(\d{5})\s+(\d{3,4})", norm)
         current_reading = None
         previous_reading = None
         if meter_readings:
             current_reading = meter_readings.group(1)
             previous_reading = meter_readings.group(2)
+        else:
+            # Try alternative pattern for different spacing
+            meter_readings = re.search(r"(\d{5})\s*(\d{5})\s*(\d{3,4})", norm)
+            if meter_readings:
+                current_reading = meter_readings.group(1)
+                previous_reading = meter_readings.group(2)
 
         # Days (ΗΜΕΡΑΣ)
         days = _safe_search(r"ΗΜΕΡΑΣ\s+(\d+)", norm, re.IGNORECASE)
