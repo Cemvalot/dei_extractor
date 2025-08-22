@@ -1,0 +1,45 @@
+# Webapp Configuration
+app:
+  default_mode: "streamlit"  # streamlit or fastapi
+  upload_max_mb: 200
+  max_files: 500
+  default_language: "en"  # en or gr
+  default_filter: false
+  default_verbose: false
+
+# Security
+security:
+  allowed_extensions: [".pdf", ".zip"]
+  temp_dir_cleanup_interval: 3600  # seconds
+
+# UI Text (Internationalization)
+ui_text:
+  en:
+    title: "DEI Extractor Web App"
+    upload_label: "Upload PDF files or ZIP archive"
+    filter_label: "Keep only Εκαθαριστικός"
+    verbose_label: "Verbose logs"
+    language_label: "Language"
+    process_button: "Process Files"
+    download_button: "Download Results"
+    progress_processing: "Processing files..."
+    progress_complete: "Processing complete!"
+    error_no_files: "No files uploaded"
+    error_invalid_file: "Invalid file type"
+    error_size_limit: "File size exceeds limit"
+    error_processing: "Error during processing"
+
+  gr:
+    title: "DEI Extractor Web App"
+    upload_label: "Ανέβασμα αρχείων PDF ή ZIP"
+    filter_label: "Διατήρηση μόνο Εκαθαριστικός"
+    verbose_label: "Λεπτομερείς καταγραφές"
+    language_label: "Γλώσσα"
+    process_button: "Επεξεργασία Αρχείων"
+    download_button: "Λήψη Αποτελεσμάτων"
+    progress_processing: "Επεξεργασία αρχείων..."
+    progress_complete: "Η επεξεργασία ολοκληρώθηκε!"
+    error_no_files: "Δεν ανέβηκαν αρχεία"
+    error_invalid_file: "Μη έγκυρος τύπος αρχείου"
+    error_size_limit: "Το μέγεθος του αρχείου υπερβαίνει το όριο"
+    error_processing: "Σφάλμα κατά την επεξεργασία"

@@ -199,3 +199,15 @@ Thumbs.db
 # Virtual environments
 dei_env_new/
 env_new/
+
+# Webapp-specific files
+webapp/.env
+webapp/tmp/
+webapp/temp/
+webapp/logs/
+webapp/output/
+webapp/*.log
+webapp/*.zip
+webapp/server/__pycache__/
+webapp/server/*/__pycache__/
+webapp/server/*/*/__pycache__/

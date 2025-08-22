@@ -1,0 +1,38 @@
+services:
+  dei-extractor-webapp:
+    build:
+      context: ..
+      dockerfile: webapp/Dockerfile
+    container_name: dei-extractor-webapp
+    environment:
+      - APP_MODE=${APP_MODE:-streamlit}
+      - UPLOAD_MAX_MB=${UPLOAD_MAX_MB:-200}
+      - MAX_FILES=${MAX_FILES:-500}
+      - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+      - DEFAULT_FILTER=${DEFAULT_FILTER:-false}
+      - DEFAULT_VERBOSE=${DEFAULT_VERBOSE:-false}
+      - STREAMLIT_PORT=${STREAMLIT_PORT:-8501}
+      - FASTAPI_PORT=${FASTAPI_PORT:-8000}
+    ports:
+      - "8501:8501"  # Streamlit
+      - "8000:8000"  # FastAPI
+    volumes:
+      # Mount the entire project for development (hot reload)
+      - ..:/app
+      # Exclude node_modules and other unnecessary files
+      - /app/node_modules
+      - /app/.git
+      - /app/.vscode
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dei-extractor-network
+
+networks:
+  dei-extractor-network:
+    driver: bridge
