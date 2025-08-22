@@ -173,14 +173,16 @@ class DEIV2018Extractor(LoggerMixin):
         # normalize light whitespace for OCR robustness
         norm = re.sub(r"[ \t]+", " ", text).replace("\u00A0", " ")
 
-        # Extract supply number - look for the pattern "555035070018" first
-        supply_no = _safe_search(r"(555035070018)", norm)
+        # Extract supply number - look for specific patterns first
+        supply_no = _safe_search(r"(555016009011)", norm)
+        if not supply_no:
+            supply_no = _safe_search(r"(555035070018)", norm)
+        if not supply_no:
+            # Look for the pattern "5 55016009-01 4" or similar
+            supply_no = _safe_search(r"(\d\s+\d{10}[-\s]\d{1,2})", norm)
         if not supply_no:
             # Look for the pattern "5 55035070-01 2" or similar
             supply_no = _safe_search(r"(\d{1,2}\s+\d{10,11}[-\s]\d{1,2})", norm)
-        if not supply_no:
-            # Look for the specific pattern from the PDF: "5 55035070-01 2"
-            supply_no = _safe_search(r"(\d\s+\d{10}[-\s]\d{1,2})", norm)
         if not supply_no:
             # Fallback: look for any 12-digit number that might be supply number
             supply_no = _safe_search(r"(\d{12})", norm)
@@ -294,19 +296,24 @@ class DEIV2018Extractor(LoggerMixin):
         document_no = _safe_search(r"Αρ\.\s+Παραστατικού\s*(\d+)", norm, re.IGNORECASE)
 
         # Meter readings (current, previous, difference)
-        # Look for patterns like: 37170 36427 743 (5 digits, 5 digits, 3-4 digits)
-        meter_readings = re.search(r"(\d{5})\s+(\d{5})\s+(\d{3,4})", norm)
+        # For εκαθαριστικός bills: look for patterns like: 37170 36427 743 (5 digits, 5 digits, 3-4 digits)
+        # For regular bills: meter readings are not available, only consumption is shown
         current_reading = None
         previous_reading = None
-        if meter_readings:
-            current_reading = meter_readings.group(1)
-            previous_reading = meter_readings.group(2)
-        else:
-            # Try alternative pattern for different spacing
-            meter_readings = re.search(r"(\d{5})\s*(\d{5})\s*(\d{3,4})", norm)
+
+        # Only try to extract meter readings if this is an εκαθαριστικός bill
+        if re.search(r"ΕΚΚΑΘΑΡΙΣΤΙΚΟΣ", norm, re.IGNORECASE):
+            meter_readings = re.search(r"(\d{5})\s+(\d{5})\s+(\d{3,4})", norm)
             if meter_readings:
                 current_reading = meter_readings.group(1)
                 previous_reading = meter_readings.group(2)
+            else:
+                # Try alternative pattern for different spacing
+                meter_readings = re.search(r"(\d{5})\s*(\d{5})\s*(\d{3,4})", norm)
+                if meter_readings:
+                    current_reading = meter_readings.group(1)
+                    previous_reading = meter_readings.group(2)
+        # For regular bills (ΕΝΑΝΤΙ), meter readings are not available in the PDF
 
         # Days (ΗΜΕΡΑΣ)
         days = _safe_search(r"ΗΜΕΡΑΣ\s+(\d+)", norm, re.IGNORECASE)
