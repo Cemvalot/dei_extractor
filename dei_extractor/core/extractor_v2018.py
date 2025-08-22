@@ -300,6 +300,7 @@ class DEIV2018Extractor(LoggerMixin):
         # For regular bills: meter readings are not available, only consumption is shown
         current_reading = None
         previous_reading = None
+        difference_reading = None
 
         # Only try to extract meter readings if this is an εκαθαριστικός bill
         if re.search(r"ΕΚΚΑΘΑΡΙΣΤΙΚΟΣ", norm, re.IGNORECASE):
@@ -307,16 +308,26 @@ class DEIV2018Extractor(LoggerMixin):
             if meter_readings:
                 current_reading = meter_readings.group(1)
                 previous_reading = meter_readings.group(2)
+                difference_reading = meter_readings.group(3)
             else:
                 # Try alternative pattern for different spacing
                 meter_readings = re.search(r"(\d{5})\s*(\d{5})\s*(\d{3,4})", norm)
                 if meter_readings:
                     current_reading = meter_readings.group(1)
                     previous_reading = meter_readings.group(2)
+                    difference_reading = meter_readings.group(3)
         # For regular bills (ΕΝΑΝΤΙ), meter readings are not available in the PDF
 
         # Days (ΗΜΕΡΑΣ)
         days = _safe_search(r"ΗΜΕΡΑΣ\s+(\d+)", norm, re.IGNORECASE)
+
+        # Extract multiplier (ΣΩΧΒ) - look for pattern like "25 1 1,0000" where the second number is the multiplier
+        multiplier = None
+        multiplier_match = re.search(r"(\d+)\s+(1|40|80)\s+[\d,]+", norm)
+        if multiplier_match:
+            multiplier = multiplier_match.group(
+                2
+            )  # The second number is the multiplier (1, 40, or 80)
 
         # Map v2018 fields to modern layout field names
         return {
@@ -330,8 +341,8 @@ class DEIV2018Extractor(LoggerMixin):
             "Πόλη": city if city else None,
             "Τελευταία": current_reading,  # Now available from v2018
             "Προηγούμενη": previous_reading,  # Now available from v2018
-            "ΣΩΧΒ": kwh,  # Map kWh to ΣΩΧΒ
-            "ΣυνΩΧΒ": days,  # Map days to ΣυνΩΧΒ
+            "ΣΩΧΒ": multiplier,  # Πολλαπλασιαστής (1, 40, or 80)
+            "ΣυνΩΧΒ": difference_reading,  # Διαφορά (difference)
             "ΚατηγορίαΤιμολογίου": category,  # Map Κατηγορία to ΚατηγορίαΤιμολογίου
             "Υποκατηγορία": None,  # Not available in v2018
             "Εκαθαριστικός": True if kind == "ΕΚΚΑΘΑΡΙΣΤΙΚΟΣ" else False,
