@@ -70,6 +70,17 @@ class FilterEkatharistikos(LoggerMixin):
 
         return combined_df
 
+    def ensure_consistent_data_types(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Ensure consistent data types for key columns to prevent sorting issues."""
+        # Convert ID columns to strings to prevent mixed type sorting issues
+        if "ΑρΠαροχής" in df.columns:
+            df["ΑρΠαροχής"] = df["ΑρΠαροχής"].astype(str)
+        if "ΑρΛογαριασμού" in df.columns:
+            df["ΑρΛογαριασμού"] = df["ΑρΛογαριασμού"].astype(str)
+
+        self.logger.info("Ensured consistent data types for ID columns")
+        return df
+
     def filter_ekatharistikos(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filter data to keep only rows where Εκαθαριστικός is True/1/Yes."""
         if "Εκαθαριστικός" not in df.columns:
@@ -98,6 +109,12 @@ class FilterEkatharistikos(LoggerMixin):
     def remove_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
         """Remove duplicate rows based on composite key or fallback to
         full row comparison."""
+        # Ensure ID columns are strings to prevent sorting issues
+        if "ΑρΠαροχής" in df.columns:
+            df["ΑρΠαροχής"] = df["ΑρΠαροχής"].astype(str)
+        if "ΑρΛογαριασμού" in df.columns:
+            df["ΑρΛογαριασμού"] = df["ΑρΛογαριασμού"].astype(str)
+
         dedup_key = [
             c for c in ["ΑρΠαροχής", "ΑρΛογαριασμού", "ΗμΈκδοσης"] if c in df.columns
         ]
@@ -167,8 +184,9 @@ class FilterEkatharistikos(LoggerMixin):
     ) -> None:
         """Write filtered data to CSV and Excel files."""
         try:
-            # Sort and group by ΑρΠαροχής if the column exists
+            # Ensure ID columns are strings before sorting
             if "ΑρΠαροχής" in df.columns:
+                df["ΑρΠαροχής"] = df["ΑρΠαροχής"].astype(str)
                 df = df.sort_values(by=["ΑρΠαροχής"])
                 self.logger.info(f"Sorted {len(df)} records by ΑρΠαροχής")
 
@@ -193,6 +211,9 @@ class FilterEkatharistikos(LoggerMixin):
         if df.empty:
             self.logger.warning("No data to process")
             return df
+
+        # Ensure consistent data types first
+        df = self.ensure_consistent_data_types(df)
 
         # Apply filters and transformations
         df = self.filter_ekatharistikos(df)
