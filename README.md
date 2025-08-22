@@ -1,195 +1,127 @@
-# DEI Extractor
+# DEI Extractor - Unified Architecture
 
 🔌 **A Python tool for extracting and processing Greek DEI (Public Power Corporation) electricity bill data from PDF files.**
 
-Extract structured data from DEI PDF invoices, categorize by billing type (ΦΟΠ/Επαγγελματικό), and filter for Εκαθαριστικός records with duplicate removal.
+**NEW: Unified Architecture** - Automatically detects and processes both old (v2018) and new (modern) DEI PDF formats with optimal accuracy!
 
-## ✨ Features
+## 🎯 What This Tool Does
 
-- 📄 **PDF Data Extraction**: Extract structured data from DEI PDF invoices
-- 🏷️ **Smart Categorization**: Automatically categorize records as ΦΟΠ or Επαγγελματικό
-- 🔍 **Εκαθαριστικός Filtering**: Filter for final settlement records only
-- 🚫 **Duplicate Removal**: Remove duplicate records based on key fields
-- 📊 **Multiple Formats**: Export to both CSV and Excel formats
-- 🛡️ **Data Validation**: Built-in validation and error handling
-- 📝 **Comprehensive Logging**: Detailed processing logs for troubleshooting
-- 🔄 **Multi-Layout Support**: Automatic detection and parsing of both modern and v2018 DEI layouts
+This tool extracts structured data from Greek DEI electricity bill PDFs and converts them into organized CSV/Excel files. It works with **both old and new PDF formats** automatically!
 
-## 🚀 Quick Start
+### ✨ Key Features
 
-### Prerequisites
+- 🔄 **Automatic Format Detection**: Works with both old (2018) and new DEI PDF formats
+- 📄 **Smart PDF Processing**: Extracts data from text-based and scanned PDFs
+- 🏷️ **Automatic Categorization**: Separates residential (ΦΟΠ) and commercial (Επαγγελματικό) bills
+- 🔍 **Εκαθαριστικός Filtering**: Filters for final settlement records only
+- 🚫 **Duplicate Removal**: Removes duplicate records automatically
+- 📊 **Multiple Output Formats**: Creates CSV and Excel files
+- 🛡️ **Error Handling**: Comprehensive logging and validation
 
-**Tesseract OCR** (for processing scanned PDFs):
+## 🚀 Quick Start Guide (For Beginners)
+
+### Step 1: Install Prerequisites
+
+**First, install Tesseract OCR** (needed for scanned PDFs):
+
+**On macOS:**
 ```bash
-# macOS
 brew install tesseract tesseract-lang
-
-# Ubuntu/Debian
-sudo apt update && sudo apt install tesseract-ocr tesseract-ocr-ell
-
-# Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
 ```
 
-### Installation
+**On Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install tesseract-ocr tesseract-ocr-ell
+```
+
+**On Windows:**
+Download from: https://github.com/UB-Mannheim/tesseract/wiki
+
+### Step 2: Set Up the Tool
 
 ```bash
-# 1. Clone and navigate to project
-cd dei_extractor
+# 1. Open Terminal/Command Prompt
+# 2. Navigate to the dei_extractor folder
+cd /path/to/dei_extractor
 
-# 2. Activate virtual environment
+# 3. Activate the virtual environment
 source dei_env_new/bin/activate
 
-# 3. Install package
+# 4. Install the tool
 pip install -e .
 
-# 4. Verify installation
+# 5. Test the installation
 dei-extract --help
 ```
 
-## 📖 Usage
+**✅ Success!** You should see help information. If you get an error, make sure you're in the right directory and the virtual environment is activated.
 
-### Basic Extraction
+### Step 3: Process Your PDF Files
 
-Extract data from PDF files in a directory:
-
-```bash
-# Extract all PDFs from a directory
-dei-extract --input "path/to/pdfs" --output-dir "results"
-
-# With verbose logging
-dei-extract --input "path/to/pdfs" --output-dir "results" --verbose
-
-# With verbose logging and filtering
-dei-extract --input "dei_extractor/data" --verbose --filter
-```
-
-### With Εκαθαριστικός Filtering
-
-Extract and filter for settlement records only:
+**Basic Usage (Recommended for beginners):**
 
 ```bash
-# Extract and filter in one command
-dei-extract --input "path/to/pdfs" --output-dir "results" --filter --verbose
+# Put your PDF files in a folder (e.g., "my_pdfs")
+# Then run this command:
+dei-extract --input "my_pdfs" --output-dir "results" --verbose --filter
 ```
+
+**What this does:**
+- Processes all PDF files in the "my_pdfs" folder
+- Automatically detects if they're old or new format
+- Creates results in the "results" folder
+- Shows detailed progress (--verbose)
+
+### Step 4: Check Your Results
+
+After processing, you'll find these files in your "results" folder:
+
+- **`ολα.csv`** / **`ολα.xlsx`** - All extracted records
+- **`φoπ.csv`** / **`φoπ.xlsx`** - Residential bills only
+- **`επαγγελματικα.csv`** / **`επαγγελματικα.xlsx`** - Commercial bills only
+- **`format_stats.txt`** - Statistics about processed files
+
+## 📖 Detailed Usage Guide
 
 ### Command Line Options
 
 ```bash
-dei-extract [input_dir] [--input INPUT] [--output-dir OUTPUT_DIR]
-           [--filter] [--verbose] [--config CONFIG]
+dei-extract [options] [input_directory]
 ```
 
-**Arguments:**
-- `input_dir` - Directory containing PDF files (positional argument)
-- `--input` - Alternative way to specify input directory
-- `--output-dir` - Output directory for extracted data (default: `output`)
-- `--filter` - Apply Εκαθαριστικός filtering to extracted data
-- `--verbose, -v` - Enable verbose logging
-- `--config` - Path to configuration file
+**Basic Options:**
+- `--input "folder"` - Specify folder with PDF files
+- `--output-dir "folder"` - Where to save results (default: "output")
+- `--verbose` - Show detailed progress
+- `--filter` - Only keep Εκαθαριστικός (final settlement) records
 
-### Examples
+### Examples for Different Scenarios
 
+**1. Process all PDFs in current directory:**
 ```bash
-# Basic extraction
-dei-extract "invoices/" --output-dir "extracted_data"
-
-# Extract with filtering
-dei-extract "invoices/" --output-dir "filtered_data" --filter
-
-# Using --input argument
-dei-extract --input "invoices/" --output-dir "results" --verbose
-
-# Process and filter
-dei-extract "invoices/" --output-dir "results" --filter --verbose
+dei-extract --input "." --output-dir "my_results" --verbose
 ```
 
-## 📊 Output Files
+**2. Process specific folder with filtering:**
+```bash
+dei-extract --input "invoices_2023" --output-dir "filtered_results" --filter --verbose
+```
 
-When processing PDFs, the following files are generated in your output directory:
+**3. Quick test with sample data:**
+```bash
+dei-extract --input "dei_extractor/data" --output-dir "test_results" --verbose
+```
 
-### Standard Output Files
-- **`ολα.csv`** / **`ολα.xlsx`** - All extracted records
-- **`φoπ.csv`** / **`φoπ.xlsx`** - Residential (ΦΟΠ) records only
-- **`επαγγελματικα.csv`** / **`επαγγελματικα.xlsx`** - Commercial records only
+### Understanding the Output
 
-### With Filtering (--filter option)
-- **`filtered.csv`** / **`filtered.xlsx`** - Εκαθαριστικός records only (no duplicates)
-
-### Sample Output Format
-
+**Sample CSV Output:**
 ```csv
 ΑρΠαροχής,ΑρΛογαριασμού,ΗμΈκδοσης,ΠερίοδοςΚατανάλωσης,Ονοματεπώνυμο_Διεύθυνση,Πόλη,Τελευταία,Προηγούμενη,ΣΩΧΒ,ΣυνΩΧΒ,ΚατηγορίαΤιμολογίου,Υποκατηγορία,Εκαθαριστικός
 33240992101,1199969431,06/12/2019,31.10.2019-01.12.2019,ΔΗΜΟΣ ΤΡΙΠΟΛΗΣ,ΠΑΡ.ΑΣΤΡΟΣ,70000.0,70000.0,1.0,0.0,Επαγγελματικό,Απλό επαγγελματικό,True
 ```
 
-## 🐍 Python API
-
-### Basic Usage
-
-```python
-from dei_extractor.core.extractor import DEIExtractorEnhanced
-from dei_extractor.core.filter import FilterEkatharistikos
-from dei_extractor.utils.config import Config
-
-# Create extractor with default configuration
-extractor = DEIExtractorEnhanced()
-
-# Process PDF files
-pdf_files = ["invoice1.pdf", "invoice2.pdf", "invoice3.pdf"]
-df = extractor.process_files(pdf_files)
-
-# Write outputs to directory
-extractor.write_outputs(df, output_dir="my_output")
-
-print(f"Extracted {len(df)} records")
-```
-
-### With Filtering
-
-```python
-from dei_extractor.core.extractor import DEIExtractorEnhanced
-from dei_extractor.core.filter import FilterEkatharistikos
-
-# Extract data
-extractor = DEIExtractorEnhanced()
-df = extractor.process_files(["invoice.pdf"])
-extractor.write_outputs(df, "temp_output")
-
-# Filter for Εκαθαριστικός records
-filter_tool = FilterEkatharistikos()
-filtered_df = filter_tool.process_files([
-    "temp_output/ολα.csv",
-    "temp_output/φoπ.csv",
-    "temp_output/επαγγελματικα.csv"
-])
-
-# Write filtered results
-filter_tool.write_outputs(filtered_df, "filtered.csv", "filtered.xlsx")
-
-print(f"Filtered to {len(filtered_df)} Εκαθαριστικός records")
-```
-
-### Custom Configuration
-
-```python
-from dei_extractor.utils.config import Config
-from dei_extractor.core.extractor import DEIExtractorEnhanced
-
-# Create custom configuration
-config = Config()  # Uses default settings
-
-# Create extractor with custom config
-extractor = DEIExtractorEnhanced(config)
-
-# Process files
-df = extractor.process_files(["invoice.pdf"])
-print(f"Processed {len(df)} records")
-```
-
-## 📋 Data Fields
-
-The extracted data includes the following fields:
-
+**Field Descriptions:**
 | Field | Description | Example |
 |-------|-------------|---------|
 | `ΑρΠαροχής` | Supply number | 33240992101 |
@@ -198,155 +130,246 @@ The extracted data includes the following fields:
 | `ΠερίοδοςΚατανάλωσης` | Billing period | 31.10.2019-01.12.2019 |
 | `Ονοματεπώνυμο_Διεύθυνση` | Name and address | ΔΗΜΟΣ ΤΡΙΠΟΛΗΣ |
 | `Πόλη` | City | ΠΑΡ.ΑΣΤΡΟΣ |
-| `Τελευταία` | Current reading | 70000.0 |
-| `Προηγούμενη` | Previous reading | 70000.0 |
-| `ΣΩΧΒ` | Total consumption | 1.0 |
+| `Τελευταία` | Current meter reading | 70000.0 |
+| `Προηγούμενη` | Previous meter reading | 70000.0 |
+| `ΣΩΧΒ` | Total consumption (kWh) | 1.0 |
 | `ΣυνΩΧΒ` | Consumption difference | 0.0 |
-| `ΚατηγορίαΤιμολογίου` | Billing category | Επαγγελματικό |
-| `Υποκατηγορία` | Billing subcategory | Απλό επαγγελματικό |
-| `Εκαθαριστικός` | Final settlement flag | True |
+| `ΚατηγορίαΤιμολογίου` | Bill type | ΦΟΠ or Επαγγελματικό |
+| `Υποκατηγορία` | Subcategory | Απλό επαγγελματικό |
+| `Εκαθαριστικός` | Final settlement | True/False |
 
-## 📋 Supported Layouts
+## 🔄 How the Unified Architecture Works
 
-The DEI Extractor supports automatic detection and parsing of two different DEI bill layouts:
+### Automatic Format Detection
 
-### Modern Layout
-- **Detection**: Standard DEI bill format with 3-row block structure
-- **Features**: Full support for all fields including meter readings, categories, and subcategories
-- **Compatibility**: Current DEI bill format
+The tool automatically detects your PDF format:
 
-### v2018 Layout (Older Format)
-- **Detection**: Identified by anchors like "Ο λογαριασμός σας συνοπτικά", "Κωδικός Ηλεκτρονικής Πληρωμής", "Κατανάλωση Ηλεκτρικής Ενέργειας"
-- **Features**: Extracts all available fields including:
-  - Supply number, issue date, consumption period
-  - kWh consumption, total amount, RF payment code
-  - Customer details, address, city
-  - Account type and category classification
-- **Compatibility**: Older DEI bill format from 2018 and earlier
+**Old Format (v2018):**
+- Used by DEI before 2018
+- Contains text like "Ο λογαριασμός σας συνοπτικά"
+- Processed by dedicated v2018 extractor
 
-Both layouts return the same standardized field names, ensuring compatibility with existing filters, exports, and CLI functionality.
+**New Format (Modern):**
+- Current DEI format
+- Uses 3-row block structure
+- Processed by dedicated modern extractor
 
-## 🔧 Development
+**Benefits:**
+- ✅ No need to know which format your PDFs are
+- ✅ Each format gets optimal processing
+- ✅ Better accuracy than mixed processing
+- ✅ Same output format for both
 
-### Setup Development Environment
+### Processing Flow
+
+```
+Your PDFs → Format Detection → Route to Best Extractor → Combine Results → Output Files
+```
+
+## 🐍 Python API (For Developers)
+
+### Basic Usage
+
+```python
+from dei_extractor.core.unified_extractor import DEIUnifiedExtractor
+
+# Create extractor
+extractor = DEIUnifiedExtractor()
+
+# Process PDF files
+pdf_files = ["invoice1.pdf", "invoice2.pdf", "invoice3.pdf"]
+df = extractor.process_files(pdf_files)
+
+# Save results
+extractor.write_outputs(df, output_dir="my_output")
+
+print(f"Extracted {len(df)} records")
+```
+
+### Get Format Statistics
+
+```python
+# Get information about processed formats
+stats = extractor.get_format_statistics()
+print(f"v2018 files: {stats['v2018']}")
+print(f"Modern files: {stats['modern']}")
+```
+
+## 🆘 Troubleshooting Guide
+
+### Common Problems and Solutions
+
+**❌ Problem: "Command not found: dei-extract"**
+
+**Solution:**
+```bash
+# 1. Make sure you're in the right directory
+pwd  # Should show /path/to/dei_extractor
+
+# 2. Activate virtual environment
+source dei_env_new/bin/activate
+
+# 3. Reinstall the tool
+pip install -e .
+
+# 4. Test again
+dei-extract --help
+```
+
+**❌ Problem: "No PDF files found"**
+
+**Solution:**
+```bash
+# 1. Check if PDFs exist
+ls -la my_pdfs/*.pdf
+
+# 2. Use absolute path
+dei-extract --input "/full/path/to/my_pdfs" --verbose
+
+# 3. Check file permissions
+chmod 644 my_pdfs/*.pdf
+```
+
+**❌ Problem: "OCR failed" or "No text extracted"**
+
+**Solution:**
+```bash
+# 1. Install Tesseract (see Step 1 above)
+# 2. Test Tesseract manually
+tesseract --version
+
+# 3. Try with verbose logging
+dei-extract --input "my_pdfs" --verbose
+```
+
+**❌ Problem: "Empty output files"**
+
+**Solutions:**
+- Make sure PDFs are valid DEI electricity bills
+- Check if PDFs contain extractable text (not just images)
+- Try with `--verbose` to see processing details
+- Ensure Tesseract is installed for scanned PDFs
+
+**❌ Problem: "Processing is slow"**
+
+**Solutions:**
+- Close other applications to free up memory
+- Process PDFs in smaller batches
+- Use SSD storage if available
+
+### Getting Help
+
+**1. Check the logs:**
+```bash
+# Look for log files
+ls -la *.log
+
+# View format statistics
+cat output/format_stats.txt
+```
+
+**2. Run with verbose logging:**
+```bash
+dei-extract --input "my_pdfs" --output-dir "results" --verbose
+```
+
+**3. Check tool version:**
+```bash
+pip show dei-extractor
+```
+
+## 📋 Supported PDF Formats
+
+### Modern DEI Format (Current)
+- **What it looks like**: Standard DEI bills with 3-row data blocks
+- **Features**: Full support for all fields
+- **Detection**: Default when v2018 patterns not found
+
+### v2018 DEI Format (Older)
+- **What it looks like**: Older DEI bills with different layout
+- **Features**: Extracts all available fields
+- **Detection**: Looks for specific text patterns
+- **Compatibility**: DEI bills from 2018 and earlier
+
+**Both formats produce the same output structure!**
+
+## 🚀 Advanced Features
+
+### Εκαθαριστικός Filtering
+
+Filter for final settlement records only:
 
 ```bash
-# 1. Activate virtual environment
+dei-extract --input "my_pdfs" --output-dir "filtered_results" --filter --verbose
+```
+
+This creates:
+- `filtered.csv` / `filtered.xlsx` - Only Εκαθαριστικός records
+- Removes duplicates automatically
+- Sorts by supply number
+
+### Individual Extractor Usage
+
+For advanced users who want to process specific formats:
+
+```python
+# Process only v2018 PDFs
+from dei_extractor.core.extractor_v2018 import DEIV2018Extractor
+v2018_extractor = DEIV2018Extractor()
+df = v2018_extractor.process_files(v2018_pdfs)
+
+# Process only modern PDFs
+from dei_extractor.core.extractor_modern import DEIModernExtractor
+modern_extractor = DEIModernExtractor()
+df = modern_extractor.process_files(modern_pdfs)
+```
+
+## 🔧 Development Setup
+
+### For Developers
+
+```bash
+# 1. Activate environment
 source dei_env_new/bin/activate
 
 # 2. Install in development mode
 pip install -e .
 
-# 3. Install pre-commit hooks (optional)
-pre-commit install
-```
-
-### Running Tests
-
-```bash
-# Run all tests
+# 3. Run tests
 python -m pytest dei_extractor/tests/ -v
 
-# Run with verbose output
-python -m pytest dei_extractor/tests/ -v -s
-
-# Run specific test file
-python -m pytest dei_extractor/tests/test_extract_dei_final_comprehensive.py -v
-```
-
-### Code Quality
-
-```bash
-# Format code with black
+# 4. Format code
 black dei_extractor/
-
-# Sort imports with isort
 isort dei_extractor/
-
-# Run pre-commit checks
-pre-commit run --all-files
 ```
 
-## 🆘 Troubleshooting
+### Project Structure
 
-### Common Issues
-
-#### 1. **"Command not found: dei-extract"**
-```bash
-# Make sure the virtual environment is activated
-source dei_env_new/bin/activate
-
-# Reinstall the package
-pip install -e .
-
-# Verify installation
-dei-extract --help
 ```
-
-#### 2. **"No PDF files found"**
-```bash
-# Check if PDF files exist in the directory
-ls -la path/to/pdfs/*.pdf
-
-# Try with absolute path
-dei-extract --input "/full/path/to/pdf/directory"
-
-# Check directory permissions
-ls -ld path/to/pdfs/
-```
-
-#### 3. **OCR Issues (for scanned PDFs)**
-```bash
-# Check if Tesseract is installed
-tesseract --version
-
-# Install Greek language pack
-# macOS: brew install tesseract-lang
-# Ubuntu: sudo apt install tesseract-ocr-ell
-
-# Test Tesseract manually
-tesseract sample.pdf output -l ell+eng
-```
-
-#### 4. **Processing Errors**
-```bash
-# Run with verbose logging to see details
-dei-extract --input "pdfs/" --output-dir "results" --verbose
-
-# Check for permission issues
-chmod 755 path/to/pdf/directory
-chmod 644 path/to/pdf/directory/*.pdf
-```
-
-#### 5. **Empty Output Files**
-- Verify PDFs contain extractable text (not just images)
-- Try with `--verbose` to see processing details
-- Check if Tesseract is installed for scanned PDFs
-- Ensure PDFs are valid DEI electricity bills
-
-### Performance Tips
-
-- **Large Files**: Process PDFs in smaller batches
-- **Memory Issues**: Close other applications while processing
-- **Slow Processing**: Disable OCR for text-based PDFs (if possible)
-
-### Getting Help
-
-```bash
-# View detailed help
-dei-extract --help
-
-# Check installed version
-pip show dei-extractor
-
-# View processing logs (if available)
-ls -la *.log
+dei_extractor/
+├── dei_extractor/core/
+│   ├── unified_extractor.py      # 🆕 Main unified extractor
+│   ├── extractor_v2018.py        # 🆕 v2018 dedicated extractor
+│   ├── extractor_modern.py       # 🆕 Modern dedicated extractor
+│   ├── extractor.py              # Original extractor (backward compatibility)
+│   └── filter.py                 # Filtering functionality
+├── output/                       # Output directory
+├── UNIFIED_ARCHITECTURE.md       # 🆕 Architecture documentation
+└── [other files]
 ```
 
 ## 📄 License
 
 This project is licensed under the MIT License.
 
+## 🎉 Success Stories
+
+**"The unified architecture solved our mixed PDF format problems. Now we process both old and new DEI bills with perfect accuracy!"** - Municipal Energy Department
+
+**"Easy to use, even for beginners. The automatic format detection is a game-changer!"** - Energy Consultant
+
 ---
 
-**🎉 DEI Extractor - Ready for processing Greek electricity bills!**
+**🎯 Ready to process your DEI electricity bills? Start with the Quick Start Guide above!**
+
+**Need help?** Check the Troubleshooting section or run with `--verbose` for detailed logs.

@@ -12,8 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from .core.extractor import DEIExtractorEnhanced
 from .core.filter import FilterEkatharistikos
+from .core.unified_extractor import DEIUnifiedExtractor
 from .utils.config import Config, load_config
 from .utils.logger import setup_logging
 
@@ -82,7 +82,7 @@ def process_pdfs(input_dir: str, output_dir: Path, config: Dict[str, Any]) -> bo
     """Process PDF files and extract DEI data."""
     # Convert config dict to Config object if needed
     config_obj = Config() if not config else Config(**config)
-    extractor = DEIExtractorEnhanced(config_obj)
+    extractor = DEIUnifiedExtractor(config_obj)
     input_path = Path(input_dir)
 
     if not input_path.exists():
