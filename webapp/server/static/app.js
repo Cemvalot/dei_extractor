@@ -123,8 +123,8 @@ class DEIExtractorApp {
             formData.append('verbose', document.getElementById('verbose').checked);
             formData.append('language', document.getElementById('language').value);
 
-            // Send request
-            const response = await fetch('/api/jobs/download', {
+            // Use the new progress endpoint
+            const response = await fetch('/api/jobs/progress', {
                 method: 'POST',
                 body: formData
             });
@@ -134,26 +134,51 @@ class DEIExtractorApp {
                 throw new Error(errorData.detail || 'Processing failed');
             }
 
-            // Get the ZIP file
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
+            // Handle Server-Sent Events for progress updates
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
 
-            // Get filename from response headers
-            const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'dei_extractor_results.zip';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+
+                            // Update progress bar
+                            this.progressFill.style.width = `${data.percentage}%`;
+                            this.progressText.textContent = data.message;
+
+                            // Check if processing is complete
+                            if (data.percentage === 100) {
+                                if (data.download_ready) {
+                                    this.hideProgress();
+                                    this.showResults('Processing completed successfully!');
+
+                                    // Store download info
+                                    this.downloadUrl = null; // Will be downloaded separately
+                                    this.downloadFilename = data.filename || 'dei_extractor_results.zip';
+
+                                    // Trigger download
+                                    this.downloadResults();
+                                } else {
+                                    this.hideProgress();
+                                    this.showError(data.message);
+                                    this.processBtn.disabled = false;
+                                }
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing progress data:', e);
+                        }
+                    }
                 }
             }
-
-            // Store for download
-            this.downloadUrl = url;
-            this.downloadFilename = filename;
-
-            this.hideProgress();
-            this.showResults('Processing completed successfully!');
 
         } catch (error) {
             console.error('Processing error:', error);
@@ -164,13 +189,45 @@ class DEIExtractorApp {
     }
 
     downloadResults() {
-        if (this.downloadUrl) {
-            const a = document.createElement('a');
-            a.href = this.downloadUrl;
-            a.download = this.downloadFilename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+        if (this.downloadFilename) {
+            // Create a new request to get the ZIP file
+            const formData = new FormData();
+
+            // Add files
+            this.selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Add options
+            formData.append('apply_filter', document.getElementById('applyFilter').checked);
+            formData.append('verbose', document.getElementById('verbose').checked);
+            formData.append('language', document.getElementById('language').value);
+
+            // Download the ZIP file
+            fetch('/api/jobs/download', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Download failed');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = this.downloadFilename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Download error:', error);
+                this.showError('Download failed: ' + error.message);
+            });
         }
     }
 
@@ -178,24 +235,11 @@ class DEIExtractorApp {
         this.progressSection.style.display = 'block';
         this.resultsSection.style.display = 'none';
         this.errorSection.style.display = 'none';
-
-        // Animate progress bar
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            this.progressFill.style.width = `${progress}%`;
-        }, 500);
-
-        this.progressInterval = interval;
+        this.progressFill.style.width = '0%';
     }
 
     hideProgress() {
         this.progressSection.style.display = 'none';
-        if (this.progressInterval) {
-            clearInterval(this.progressInterval);
-            this.progressInterval = null;
-        }
         this.progressFill.style.width = '100%';
     }
 

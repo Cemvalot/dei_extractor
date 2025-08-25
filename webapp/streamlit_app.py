@@ -122,7 +122,7 @@ def validate_files(uploaded_files: List) -> tuple[bool, str, List]:
 
 
 def process_files(
-    files: List, apply_filter: bool, verbose: bool
+    files: List, apply_filter: bool, verbose: bool, progress_bar, status_text
 ) -> tuple[bool, str, bytes, List]:
     """Process uploaded files and return results."""
     services = get_services()
@@ -134,10 +134,12 @@ def process_files(
     run_dir = storage_service.create_run_directory()
 
     try:
-        # Save uploaded files
-        pdf_files = []
+        # Progress: 0-20% - File preparation
+        progress_bar.progress(0)
+        status_text.text("Preparing files...")
 
-        for file in files:
+        pdf_files = []
+        for i, file in enumerate(files):
             content = file.read()
             file_path = storage_service.save_uploaded_file(content, file.name, run_dir)
 
@@ -148,41 +150,74 @@ def process_files(
             else:
                 pdf_files.append(file_path)
 
-        # Validate input directory
+            # Update progress for file preparation
+            progress = int(20 * (i + 1) / len(files))
+            progress_bar.progress(progress / 100)
+            status_text.text(f"Prepared {i+1}/{len(files)} files")
+
+        # Progress: 20-30% - Validation
+        progress_bar.progress(0.2)
+        status_text.text("Validating input...")
+
         input_dir = run_dir / "input"
         is_valid, validation_msg = extractor_service.validate_input_directory(input_dir)
 
         if not is_valid:
+            progress_bar.progress(1.0)
+            status_text.text("Validation failed")
             return False, validation_msg, b"", []
 
-        # Run extractor
+        progress_bar.progress(0.3)
+        status_text.text("Validation complete")
+
+        # Progress: 30-90% - Processing
+        def progress_callback(percentage: int, message: str):
+            # Scale the percentage from 30-90 range
+            scaled_percentage = 0.3 + (percentage / 100) * 0.6
+            progress_bar.progress(scaled_percentage)
+            status_text.text(message)
+
         output_dir = run_dir / "output"
         success, log_output, warnings = extractor_service.run_extractor(
             input_dir=input_dir,
             output_dir=output_dir,
             apply_filter=apply_filter,
             verbose=verbose,
+            progress_callback=progress_callback,
         )
 
         if not success:
+            progress_bar.progress(1.0)
+            status_text.text("Processing failed")
             return False, "Processing failed", b"", warnings
 
-        # Create run log
+        # Progress: 90-95% - Creating outputs
+        progress_bar.progress(0.9)
+        status_text.text("Creating output files...")
+
         log_content = (
             f"Processing completed\n\nLog output:\n{log_output}\n\nWarnings:\n"
             + "\n".join(warnings)
         )
         storage_service.create_run_log(run_dir, log_content)
 
-        # Create ZIP file
+        # Progress: 95-100% - Creating ZIP
+        progress_bar.progress(0.95)
+        status_text.text("Creating ZIP file...")
+
         zip_content = zipping_service.create_zip_from_directory(
             run_dir, include_log=True
         )
+
+        progress_bar.progress(1.0)
+        status_text.text("Processing completed successfully!")
 
         return True, "Processing completed successfully", zip_content, warnings
 
     except Exception as e:
         logger.error(f"Error processing files: {e}")
+        progress_bar.progress(1.0)
+        status_text.text("Error during processing")
         return False, f"Error during processing: {str(e)}", b"", [str(e)]
     finally:
         # Clean up run directory
@@ -250,17 +285,13 @@ def main():
                 return
 
             # Show progress
-            with st.spinner("Processing files..."):
-                progress_bar = st.progress(0)
-                status_text = st.empty()
+            progress_bar = st.progress(0)
+            status_text = st.empty()
 
-                # Process files
-                success, message, zip_content, warnings = process_files(
-                    valid_files, apply_filter, verbose
-                )
-
-                progress_bar.progress(100)
-                status_text.text("Processing complete!")
+            # Process files with progress tracking
+            success, message, zip_content, warnings = process_files(
+                valid_files, apply_filter, verbose, progress_bar, status_text
+            )
 
             # Show results
             if success:

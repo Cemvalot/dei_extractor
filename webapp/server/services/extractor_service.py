@@ -6,7 +6,7 @@ import logging
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,9 @@ class ExtractorService:
         apply_filter: bool = False,
         verbose: bool = False,
         config_file: Optional[str] = None,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
     ) -> Tuple[bool, str, List[str]]:
-        """Run the dei_extractor on the input directory.
+        """Run the dei_extractor on the input directory with granular progress tracking.
 
         Args:
             input_dir: Directory containing PDF files to process
@@ -38,74 +39,195 @@ class ExtractorService:
             apply_filter: Whether to apply Εκαθαριστικός filtering
             verbose: Whether to enable verbose logging
             config_file: Optional path to configuration file
+            progress_callback: Optional callback function(percentage, message) for progress updates
 
         Returns:
             Tuple of (success, log_output, warnings)
         """
-        # Build command arguments
-        cmd = [
-            sys.executable,
-            "-m",
-            "dei_extractor.cli",
-            str(input_dir),
-            "--output-dir",
-            str(output_dir),
-        ]
+        # Count total files for progress tracking
+        pdf_files = list(input_dir.glob("*.pdf"))
+        total_files = len(pdf_files)
 
-        if apply_filter:
-            cmd.append("--filter")
-
-        if verbose:
-            cmd.append("--verbose")
-
-        if config_file:
-            cmd.extend(["--config", config_file])
-
-        logger.info(f"Running extractor command: {' '.join(cmd)}")
-
-        # Capture output
-        log_output = ""
-        warnings = []
-
-        try:
-            # Run the command and capture output
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=300,  # 5 minute timeout
+        if total_files == 0:
+            if progress_callback:
+                progress_callback(0, "No PDF files found")
+            return (
+                False,
+                "No PDF files found in input directory",
+                ["No PDF files found"],
             )
 
-            # Collect log output
-            if result.stdout:
-                log_output += result.stdout
-            if result.stderr:
-                log_output += result.stderr
+        if progress_callback:
+            progress_callback(0, f"Found {total_files} PDF files to process")
 
-            # Check for warnings in the output
-            for line in log_output.split("\n"):
-                if "WARNING" in line.upper() or "WARN" in line.upper():
-                    warnings.append(line.strip())
+        # Create output directory
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Check if the command was successful
-            success = result.returncode == 0
+        log_output = ""
+        warnings = []
+        all_records = []
 
-            if success:
-                logger.info("Extractor completed successfully")
+        try:
+            # Progress: 0-5% - Initialization
+            if progress_callback:
+                progress_callback(5, "Initializing extractors...")
+
+            # Import extractors here to avoid circular imports
+            from dei_extractor.core.filter import FilterEkatharistikos
+            from dei_extractor.core.unified_extractor import DEIUnifiedExtractor
+            from dei_extractor.utils.config import Config
+
+            # Initialize extractor
+            config = Config()
+            extractor = DEIUnifiedExtractor(config)
+
+            # Progress: 5-10% - Format detection
+            if progress_callback:
+                progress_callback(10, "Detecting PDF formats...")
+
+            # Categorize PDFs by format
+            categorized_pdfs = extractor.categorize_pdfs([str(f) for f in pdf_files])
+
+            total_to_process = len(categorized_pdfs["v2018"]) + len(
+                categorized_pdfs["modern"]
+            )
+            processed_files = 0
+
+            # Progress: 10-80% - Process v2018 PDFs
+            if categorized_pdfs["v2018"]:
+                if progress_callback:
+                    progress_callback(
+                        15, f"Processing {len(categorized_pdfs['v2018'])} v2018 PDFs..."
+                    )
+
+                for i, pdf_path in enumerate(categorized_pdfs["v2018"]):
+                    if progress_callback:
+                        progress = 15 + int(
+                            35 * (i + 1) / len(categorized_pdfs["v2018"])
+                        )
+                        filename = Path(pdf_path).name
+                        progress_callback(progress, f"Processing v2018 PDF: {filename}")
+
+                    try:
+                        # Process individual file
+                        df = extractor.v2018_extractor.process_files([pdf_path])
+                        if not df.empty:
+                            all_records.extend(df.to_dict("records"))
+                            log_output += f"Extracted {len(df)} records from {Path(pdf_path).name}\n"
+                    except Exception as e:
+                        error_msg = f"Error processing {Path(pdf_path).name}: {e}"
+                        warnings.append(error_msg)
+                        log_output += error_msg + "\n"
+
+                    processed_files += 1
+
+            # Progress: 45-80% - Process modern PDFs
+            if categorized_pdfs["modern"]:
+                if progress_callback:
+                    progress_callback(
+                        50,
+                        f"Processing {len(categorized_pdfs['modern'])} modern PDFs...",
+                    )
+
+                for i, pdf_path in enumerate(categorized_pdfs["modern"]):
+                    if progress_callback:
+                        progress = 50 + int(
+                            30 * (i + 1) / len(categorized_pdfs["modern"])
+                        )
+                        filename = Path(pdf_path).name
+                        progress_callback(
+                            progress, f"Processing modern PDF: {filename}"
+                        )
+
+                    try:
+                        # Process individual file
+                        df = extractor.modern_extractor.process_files([pdf_path])
+                        if not df.empty:
+                            all_records.extend(df.to_dict("records"))
+                            log_output += f"Extracted {len(df)} records from {Path(pdf_path).name}\n"
+                    except Exception as e:
+                        error_msg = f"Error processing {Path(pdf_path).name}: {e}"
+                        warnings.append(error_msg)
+                        log_output += error_msg + "\n"
+
+                    processed_files += 1
+
+            # Progress: 80-85% - Combine results
+            if progress_callback:
+                progress_callback(80, "Combining extracted data...")
+
+            # Create combined DataFrame
+            import pandas as pd
+
+            if all_records:
+                df = pd.DataFrame(all_records)
+
+                # Sort by ΑρΠαροχής if available
+                if "ΑρΠαροχής" in df.columns:
+                    df = df.sort_values(by=["ΑρΠαροχής"])
+                    log_output += f"Sorted {len(df)} combined records by ΑρΠαροχής\n"
             else:
-                logger.error(f"Extractor failed with return code {result.returncode}")
+                df = pd.DataFrame()
 
-            return success, log_output, warnings
+            # Progress: 85-90% - Write outputs
+            if progress_callback:
+                progress_callback(85, "Writing output files...")
 
-        except subprocess.TimeoutExpired:
-            error_msg = "Extractor timed out after 5 minutes"
-            logger.error(error_msg)
-            return False, error_msg, [error_msg]
+            # Write outputs
+            if not df.empty:
+                extractor.write_outputs(df, str(output_dir))
+                log_output += f"Written {len(df)} records to output files\n"
+            else:
+                log_output += "No records extracted\n"
+
+            # Progress: 90-95% - Apply filtering if requested
+            if apply_filter and not df.empty:
+                if progress_callback:
+                    progress_callback(90, "Applying Εκαθαριστικός filtering...")
+
+                try:
+                    filter_processor = FilterEkatharistikos()
+                    filtered_df = filter_processor.process_files(
+                        [str(output_dir / "ολα.csv")]
+                    )
+
+                    if not filtered_df.empty:
+                        filter_processor.write_outputs(
+                            filtered_df,
+                            str(output_dir / "filtered.csv"),
+                            str(output_dir / "filtered.xlsx"),
+                        )
+                        log_output += f"Filtered to {len(filtered_df)} records\n"
+                    else:
+                        log_output += "No records found after filtering\n"
+                        warnings.append("No records found after filtering")
+                except Exception as e:
+                    error_msg = f"Error during filtering: {e}"
+                    warnings.append(error_msg)
+                    log_output += error_msg + "\n"
+
+            # Progress: 95-100% - Finalization
+            if progress_callback:
+                progress_callback(95, "Finalizing processing...")
+
+            # Log summary
+            log_output += f"\n=== PROCESSING SUMMARY ===\n"
+            log_output += f"Total files processed: {processed_files}\n"
+            log_output += f"v2018 files: {len(categorized_pdfs['v2018'])}\n"
+            log_output += f"Modern files: {len(categorized_pdfs['modern'])}\n"
+            log_output += f"Unknown format: {len(categorized_pdfs['unknown'])}\n"
+            log_output += f"Total records extracted: {len(df)}\n"
+
+            if progress_callback:
+                progress_callback(100, "Processing completed successfully")
+
+            return True, log_output, warnings
 
         except Exception as e:
-            error_msg = f"Error running extractor: {e}"
+            error_msg = f"Error during processing: {e}"
             logger.error(error_msg)
+            if progress_callback:
+                progress_callback(100, error_msg)
             return False, error_msg, [error_msg]
 
     def validate_input_directory(self, input_dir: Path) -> Tuple[bool, str]:
