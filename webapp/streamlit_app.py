@@ -16,6 +16,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from server.services.extractor_service import ExtractorService
+from server.services.language_service import LanguageService
 from server.services.storage import StorageService
 from server.services.zipping import ZippingService
 
@@ -83,13 +84,16 @@ def get_services():
         "storage": StorageService(),
         "extractor": ExtractorService(),
         "zipping": ZippingService(),
+        "language": LanguageService(),
     }
 
 
-def validate_files(uploaded_files: List) -> tuple[bool, str, List]:
+def validate_files(
+    uploaded_files: List, language_service: LanguageService, language: str = "gr"
+) -> tuple[bool, str, List]:
     """Validate uploaded files."""
     if not uploaded_files:
-        return False, "No files uploaded", []
+        return False, language_service.get_text("no_files_uploaded", language), []
 
     valid_files = []
     total_size = 0
@@ -109,12 +113,17 @@ def validate_files(uploaded_files: List) -> tuple[bool, str, List]:
         valid_files.append(file)
 
     if not valid_files:
-        return False, "No valid files found. Please upload PDF or ZIP files.", []
+        return False, language_service.get_text("no_valid_files", language), []
 
     if total_size > max_size_mb * 1024 * 1024:
         return (
             False,
-            f"Total file size ({total_size / 1024 / 1024:.1f}MB) exceeds limit ({max_size_mb}MB)",
+            language_service.format_text(
+                "file_size_exceeds",
+                language,
+                size=f"{total_size / 1024 / 1024:.1f}",
+                limit=str(max_size_mb),
+            ),
             [],
         )
 
@@ -122,7 +131,13 @@ def validate_files(uploaded_files: List) -> tuple[bool, str, List]:
 
 
 def process_files(
-    files: List, apply_filter: bool, verbose: bool, progress_bar, status_text
+    files: List,
+    apply_filter: bool,
+    verbose: bool,
+    progress_bar,
+    status_text,
+    language_service: LanguageService,
+    language: str = "gr",
 ) -> tuple[bool, str, bytes, List]:
     """Process uploaded files and return results."""
     services = get_services()
@@ -136,7 +151,7 @@ def process_files(
     try:
         # Progress: 0-20% - File preparation
         progress_bar.progress(0)
-        status_text.text("Preparing files...")
+        status_text.text(language_service.get_text("progress_preparing", language))
 
         pdf_files = []
         for i, file in enumerate(files):
@@ -157,14 +172,14 @@ def process_files(
 
         # Progress: 20-30% - Validation
         progress_bar.progress(0.2)
-        status_text.text("Validating input...")
+        status_text.text(language_service.get_text("progress_validating", language))
 
         input_dir = run_dir / "input"
         is_valid, validation_msg = extractor_service.validate_input_directory(input_dir)
 
         if not is_valid:
             progress_bar.progress(1.0)
-            status_text.text("Validation failed")
+            status_text.text(language_service.get_text("validation_failed", language))
             return False, validation_msg, b"", []
 
         progress_bar.progress(0.3)
@@ -188,12 +203,19 @@ def process_files(
 
         if not success:
             progress_bar.progress(1.0)
-            status_text.text("Processing failed")
-            return False, "Processing failed", b"", warnings
+            status_text.text(language_service.get_text("processing_failed", language))
+            return (
+                False,
+                language_service.get_text("processing_failed", language),
+                b"",
+                warnings,
+            )
 
         # Progress: 90-95% - Creating outputs
         progress_bar.progress(0.9)
-        status_text.text("Creating output files...")
+        status_text.text(
+            language_service.get_text("progress_creating_output", language)
+        )
 
         log_content = (
             f"Processing completed\n\nLog output:\n{log_output}\n\nWarnings:\n"
@@ -203,22 +225,27 @@ def process_files(
 
         # Progress: 95-100% - Creating ZIP
         progress_bar.progress(0.95)
-        status_text.text("Creating ZIP file...")
+        status_text.text(language_service.get_text("progress_creating_zip", language))
 
         zip_content = zipping_service.create_zip_from_directory(
             run_dir, include_log=True
         )
 
         progress_bar.progress(1.0)
-        status_text.text("Processing completed successfully!")
+        status_text.text(language_service.get_text("progress_complete", language))
 
         return True, "Processing completed successfully", zip_content, warnings
 
     except Exception as e:
         logger.error(f"Error processing files: {e}")
         progress_bar.progress(1.0)
-        status_text.text("Error during processing")
-        return False, f"Error during processing: {str(e)}", b"", [str(e)]
+        status_text.text(language_service.get_text("error_processing", language))
+        return (
+            False,
+            f"{language_service.get_text('error_processing', language)}: {str(e)}",
+            b"",
+            [str(e)],
+        )
     finally:
         # Clean up run directory
         storage_service.cleanup_run_directory(run_dir)
@@ -227,48 +254,67 @@ def process_files(
 def main():
     """Main Streamlit application."""
 
+    # Get services
+    services = get_services()
+    language_service = services["language"]
+
+    # Get language preference (default to Greek)
+    language_options = {
+        language_service.get_text("language_greek", "gr"): "gr",
+        language_service.get_text("language_english", "gr"): "en",
+    }
+
+    language_display = st.sidebar.selectbox(
+        language_service.get_text("language_label", "gr"),
+        options=list(language_options.keys()),
+        index=0,  # Default to Greek (index 0)
+        help=language_service.get_text("language_help", "gr"),
+        key="language_selector",
+    )
+
+    # Get the actual language code
+    language = language_options[language_display]
+
     # Header
     st.markdown(
-        '<h1 class="main-header">DEI Extractor Web App</h1>', unsafe_allow_html=True
+        f'<h1 class="main-header">{language_service.get_text("title", language)}</h1>',
+        unsafe_allow_html=True,
     )
     st.markdown(
-        '<p style="text-align: center; color: #7f8c8d;">Upload PDF files or ZIP archives to extract DEI data</p>',
+        f'<p style="text-align: center; color: #7f8c8d;">{language_service.get_text("subtitle", language)}</p>',
         unsafe_allow_html=True,
     )
 
     # Sidebar options
-    st.sidebar.title("Processing Options")
+    st.sidebar.title(language_service.get_text("processing_options", language))
 
     apply_filter = st.sidebar.checkbox(
-        "Keep only Εκαθαριστικός",
+        language_service.get_text("filter_label", language),
         value=False,
-        help="Apply filtering to keep only Εκαθαριστικός records",
+        help=language_service.get_text("filter_help", language),
     )
 
     verbose = st.sidebar.checkbox(
-        "Verbose logs", value=False, help="Enable verbose logging during processing"
-    )
-
-    language = st.sidebar.selectbox(
-        "Language",
-        options=["en", "gr"],
-        index=0,
-        help="UI language (extraction remains Greek-capable)",
+        language_service.get_text("verbose_label", language),
+        value=False,
+        help=language_service.get_text("verbose_help", language),
     )
 
     # File upload section
     st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-    st.subheader("📁 Upload Files")
+    st.subheader("📁 " + language_service.get_text("upload_label", language))
 
     uploaded_files = st.file_uploader(
-        "Choose PDF files or ZIP archives",
+        language_service.get_text("upload_label", language),
         type=["pdf", "zip"],
         accept_multiple_files=True,
-        help="Upload multiple PDF files or a single ZIP archive containing PDFs",
+        help=language_service.get_text("upload_help", language),
     )
 
     if uploaded_files:
-        st.write(f"**Uploaded {len(uploaded_files)} files:**")
+        st.write(
+            f"**{language_service.get_text('uploaded_files', language)} {len(uploaded_files)} files:**"
+        )
         for file in uploaded_files:
             st.write(f"• {file.name} ({file.size / 1024:.1f} KB)")
 
@@ -276,9 +322,15 @@ def main():
 
     # Process button
     if uploaded_files:
-        if st.button("🚀 Process Files", type="primary", use_container_width=True):
+        if st.button(
+            "🚀 " + language_service.get_text("process_button", language),
+            type="primary",
+            use_container_width=True,
+        ):
             # Validate files
-            is_valid, validation_msg, valid_files = validate_files(uploaded_files)
+            is_valid, validation_msg, valid_files = validate_files(
+                uploaded_files, language_service, language
+            )
 
             if not is_valid:
                 st.error(validation_msg)
@@ -290,7 +342,13 @@ def main():
 
             # Process files with progress tracking
             success, message, zip_content, warnings = process_files(
-                valid_files, apply_filter, verbose, progress_bar, status_text
+                valid_files,
+                apply_filter,
+                verbose,
+                progress_bar,
+                status_text,
+                language_service,
+                language,
             )
 
             # Show results
@@ -299,7 +357,12 @@ def main():
                 st.success("✅ " + message)
 
                 if warnings:
-                    st.warning("⚠️ Warnings during processing:")
+                    st.warning(
+                        "⚠️ "
+                        + language_service.get_text(
+                            "warnings_during_processing", language
+                        )
+                    )
                     for warning in warnings:
                         st.write(f"• {warning}")
 
@@ -312,19 +375,29 @@ def main():
                         ]
 
                         if csv_files:
-                            st.subheader("📊 Output Preview")
+                            st.subheader(
+                                "📊 "
+                                + language_service.get_text("output_preview", language)
+                            )
 
                             # Read the first CSV file for preview
                             with zip_file.open(csv_files[0]) as csv_file:
                                 df = pd.read_csv(csv_file)
                                 st.dataframe(df.head(), use_container_width=True)
-                                st.write(f"**Total rows:** {len(df)}")
+                                st.write(
+                                    f"**{language_service.get_text('total_rows', language)}** {len(df)}"
+                                )
                 except Exception as e:
-                    st.info("Output preview not available")
+                    st.info(
+                        language_service.get_text(
+                            "output_preview_not_available", language
+                        )
+                    )
 
                 # Download button
                 st.download_button(
-                    label="📥 Download Results (ZIP)",
+                    label="📥 "
+                    + language_service.get_text("download_results_zip", language),
                     data=zip_content,
                     file_name="dei_extractor_results.zip",
                     mime="application/zip",
@@ -340,10 +413,10 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown(
-        """
+        f"""
         <div style="text-align: center; color: #7f8c8d; font-size: 0.9rem;">
-            <p>DEI Extractor Web App | Built with Streamlit</p>
-            <p>Files are processed temporarily and not stored on the server</p>
+            <p>{language_service.get_text("footer_text", language)}</p>
+            <p>{language_service.get_text("footer_security", language)}</p>
         </div>
         """,
         unsafe_allow_html=True,

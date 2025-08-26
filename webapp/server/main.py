@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .models.responses import HealthResponse
 from .routers.jobs import router as jobs_router
 from .services.extractor_service import ExtractorService
+from .services.language_service import LanguageService
 
 # Configure logging
 logging.basicConfig(
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(
     title="DEI Extractor Web API",
-    description="Web API for extracting DEI data from PDF files",
+    description="Web API για εξαγωγή δεδομένων DEI από αρχεία PDF",
     version="1.0.0",
 )
 

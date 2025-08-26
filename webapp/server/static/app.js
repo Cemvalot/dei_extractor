@@ -3,8 +3,42 @@
 class DEIExtractorApp {
     constructor() {
         this.selectedFiles = [];
+        this.translations = {
+            gr: {
+                noValidFiles: 'Δεν βρέθηκαν έγκυρα αρχεία. Παρακαλώ επιλέξτε αρχεία PDF ή ZIP.',
+                noFilesSelected: 'Δεν επιλέχθηκαν αρχεία',
+                processingFailed: 'Η επεξεργασία απέτυχε',
+                downloadFailed: 'Η λήψη απέτυχε',
+                processingCompleted: 'Η επεξεργασία ολοκληρώθηκε επιτυχώς!',
+                processingFiles: 'Επεξεργασία αρχείων...',
+                preparingFiles: 'Προετοιμασία αρχείων...',
+                validatingInput: 'Επικύρωση εισόδου...',
+                creatingOutput: 'Δημιουργία αρχείων εξόδου...',
+                creatingZip: 'Δημιουργία αρχείου ZIP...',
+                validationFailed: 'Η επικύρωση απέτυχε',
+                processingFailedMsg: 'Η επεξεργασία απέτυχε',
+                errorDuringProcessing: 'Σφάλμα κατά την επεξεργασία'
+            },
+            en: {
+                noValidFiles: 'No valid files selected. Please select PDF or ZIP files.',
+                noFilesSelected: 'No files selected',
+                processingFailed: 'Processing failed',
+                downloadFailed: 'Download failed',
+                processingCompleted: 'Processing completed successfully!',
+                processingFiles: 'Processing files...',
+                preparingFiles: 'Preparing files...',
+                validatingInput: 'Validating input...',
+                creatingOutput: 'Creating output files...',
+                creatingZip: 'Creating ZIP file...',
+                validationFailed: 'Validation failed',
+                processingFailedMsg: 'Processing failed',
+                errorDuringProcessing: 'Error during processing'
+            }
+        };
+        this.currentLanguage = 'gr'; // Default to Greek
         this.initializeElements();
         this.setupEventListeners();
+        this.updateLanguage();
     }
 
     initializeElements() {
@@ -48,6 +82,12 @@ class DEIExtractorApp {
             this.handleFiles(files);
         });
 
+        // Language change
+        document.getElementById('language').addEventListener('change', (e) => {
+            this.currentLanguage = e.target.value;
+            this.updateLanguage();
+        });
+
         // Process button
         this.processBtn.addEventListener('click', () => {
             this.processFiles();
@@ -59,6 +99,16 @@ class DEIExtractorApp {
         });
     }
 
+    updateLanguage() {
+        // Update UI elements based on current language
+        const lang = this.translations[this.currentLanguage];
+
+        // Update progress text if visible
+        if (this.progressSection.style.display !== 'none') {
+            this.progressText.textContent = lang.processingFiles;
+        }
+    }
+
     handleFiles(files) {
         // Filter files by type
         const validFiles = files.filter(file => {
@@ -67,7 +117,7 @@ class DEIExtractorApp {
         });
 
         if (validFiles.length === 0) {
-            this.showError('No valid files selected. Please select PDF or ZIP files.');
+            this.showError(this.translations[this.currentLanguage].noValidFiles);
             return;
         }
 
@@ -103,7 +153,7 @@ class DEIExtractorApp {
 
     async processFiles() {
         if (this.selectedFiles.length === 0) {
-            this.showError('No files selected');
+            this.showError(this.translations[this.currentLanguage].noFilesSelected);
             return;
         }
 
@@ -131,7 +181,7 @@ class DEIExtractorApp {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail || 'Processing failed');
+                throw new Error(errorData.detail || this.translations[this.currentLanguage].processingFailed);
             }
 
             // Handle Server-Sent Events for progress updates
@@ -158,7 +208,7 @@ class DEIExtractorApp {
                             if (data.percentage === 100) {
                                 if (data.download_ready) {
                                     this.hideProgress();
-                                    this.showResults('Processing completed successfully!');
+                                    this.showResults(this.translations[this.currentLanguage].processingCompleted);
 
                                     // Store download info
                                     this.downloadUrl = null; // Will be downloaded separately
@@ -183,7 +233,7 @@ class DEIExtractorApp {
         } catch (error) {
             console.error('Processing error:', error);
             this.hideProgress();
-            this.showError(`Processing failed: ${error.message}`);
+            this.showError(`${this.translations[this.currentLanguage].processingFailed}: ${error.message}`);
             this.processBtn.disabled = false;
         }
     }
@@ -226,7 +276,7 @@ class DEIExtractorApp {
             })
             .catch(error => {
                 console.error('Download error:', error);
-                this.showError('Download failed: ' + error.message);
+                this.showError(this.translations[this.currentLanguage].downloadFailed + ': ' + error.message);
             });
         }
     }
@@ -236,6 +286,7 @@ class DEIExtractorApp {
         this.resultsSection.style.display = 'none';
         this.errorSection.style.display = 'none';
         this.progressFill.style.width = '0%';
+        this.progressText.textContent = this.translations[this.currentLanguage].processingFiles;
     }
 
     hideProgress() {

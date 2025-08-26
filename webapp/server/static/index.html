@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="gr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
     <div class="container">
         <header>
             <h1>DEI Extractor Web App</h1>
-            <p>Upload PDF files or ZIP archives to extract DEI data</p>
+            <p>Ανέβασμα αρχείων PDF ή ZIP για εξαγωγή δεδομένων DEI</p>
         </header>
 
         <main>
@@ -18,29 +18,29 @@
                 <div class="upload-zone" id="uploadZone">
                     <div class="upload-content">
                         <div class="upload-icon">📁</div>
-                        <h3>Drop files here or click to browse</h3>
-                        <p>Supports PDF files and ZIP archives</p>
+                        <h3>Αφήστε αρχεία εδώ ή κάντε κλικ για περιήγηση</h3>
+                        <p>Υποστηρίζει αρχεία PDF και ZIP</p>
                         <input type="file" id="fileInput" multiple accept=".pdf,.zip" style="display: none;">
                         <button type="button" class="browse-btn" onclick="document.getElementById('fileInput').click()">
-                            Browse Files
+                            Επιλογή Αρχείων
                         </button>
                     </div>
                 </div>
 
                 <div class="file-list" id="fileList" style="display: none;">
-                    <h4>Selected Files:</h4>
+                    <h4>Επιλεγμένα Αρχεία:</h4>
                     <ul id="selectedFiles"></ul>
                 </div>
             </div>
 
             <div class="options-section">
-                <h3>Processing Options</h3>
+                <h3>Επιλογές Επεξεργασίας</h3>
                 <div class="options-grid">
                     <div class="option">
                         <label class="checkbox-label">
                             <input type="checkbox" id="applyFilter">
                             <span class="checkmark"></span>
-                            Keep only Εκαθαριστικός
+                            Διατήρηση μόνο Εκαθαριστικός
                         </label>
                     </div>
 
@@ -48,15 +48,15 @@
                         <label class="checkbox-label">
                             <input type="checkbox" id="verbose">
                             <span class="checkmark"></span>
-                            Verbose logs
+                            Λεπτομερείς καταγραφές
                         </label>
                     </div>
 
                     <div class="option">
-                        <label for="language">Language:</label>
+                        <label for="language">Γλώσσα:</label>
                         <select id="language">
+                            <option value="gr">Ελληνικά</option>
                             <option value="en">English</option>
-                            <option value="gr">Greek</option>
                         </select>
                     </div>
                 </div>
@@ -64,7 +64,7 @@
 
             <div class="action-section">
                 <button type="button" id="processBtn" class="process-btn" disabled>
-                    Process Files
+                    Επεξεργασία Αρχείων
                 </button>
             </div>
 
@@ -72,14 +72,14 @@
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
-                <p id="progressText">Processing files...</p>
+                <p id="progressText">Επεξεργασία αρχείων...</p>
             </div>
 
             <div class="results-section" id="resultsSection" style="display: none;">
-                <h3>Processing Complete</h3>
+                <h3>Η Επεξεργασία Ολοκληρώθηκε</h3>
                 <div id="resultsContent"></div>
                 <button type="button" id="downloadBtn" class="download-btn">
-                    Download Results
+                    Λήψη Αποτελεσμάτων
                 </button>
             </div>
 

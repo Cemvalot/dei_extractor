@@ -1,6 +1,6 @@
 # DEI Extractor Web Application
 
-A modern web interface for the DEI Extractor package, providing both Streamlit and FastAPI modes for processing Greek DEI electricity bill PDFs.
+A modern web interface for the DEI Extractor package, providing both Streamlit and FastAPI modes for processing Greek DEI electricity bill PDFs. **Now with full Greek language support!**
 
 ## 🚀 Quick Start
 
@@ -68,7 +68,7 @@ UPLOAD_MAX_MB=200
 MAX_FILES=500
 
 # UI Language: en or gr
-DEFAULT_LANGUAGE=en
+DEFAULT_LANGUAGE=gr
 
 # Default options
 DEFAULT_FILTER=false
@@ -150,7 +150,7 @@ pytest server/tests/test_jobs_route.py -v
 ### Processing Options
 - ✅ **Εκαθαριστικός Filter**: Keep only final settlement records
 - ✅ **Verbose Logging**: Detailed processing information
-- ✅ **Language Selection**: UI in English or Greek
+- ✅ **Language Selection**: UI in Greek (default) or English
 - ✅ **OCR Support**: Automatic text extraction from scanned PDFs
 
 ### Output & Results
