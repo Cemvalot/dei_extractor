@@ -211,3 +211,4 @@ webapp/*.zip
 webapp/server/__pycache__/
 webapp/server/*/__pycache__/
 webapp/server/*/*/__pycache__/
+*.pyc
