@@ -98,6 +98,82 @@ def test_extractor_results():
             print("⚠ raw_code column not found - ΦΟΠ variation test skipped")
 
         # Test 9: Enhanced Features - Wrap Categories
+
+        # Test 10: New Period Fields
+        print("\nTest 10: New Period Fields")
+        if (
+            "ΠερίοδοςΚατανάλωσης_Αρχική" in df.columns
+            and "ΠερίοδοςΚατανάλωσης_Τελική" in df.columns
+        ):
+            start_not_null = len(df[df["ΠερίοδοςΚατανάλωσης_Αρχική"].notna()])
+            end_not_null = len(df[df["ΠερίοδοςΚατανάλωσης_Τελική"].notna()])
+            print(f"✓ ΠερίοδοςΚατανάλωσης_Αρχική not null: {start_not_null}")
+            print(f"✓ ΠερίοδοςΚατανάλωσης_Τελική not null: {end_not_null}")
+
+            # Test period parsing
+            sample_period = df["ΠερίοδοςΚατανάλωσης"].iloc[0]
+            sample_start = df["ΠερίοδοςΚατανάλωσης_Αρχική"].iloc[0]
+            sample_end = df["ΠερίοδοςΚατανάλωσης_Τελική"].iloc[0]
+            print(f"✓ Sample period: {sample_period}")
+            print(f"✓ Sample start: {sample_start}")
+            print(f"✓ Sample end: {sample_end}")
+        else:
+            print("⚠ New period fields not found")
+
+        # Test 11: Merge Key
+        print("\nTest 11: Merge Key")
+        if "merge_key" in df.columns:
+            merge_not_null = len(df[df["merge_key"].notna()])
+            unique_merge_keys = df["merge_key"].nunique()
+            print(f"✓ Merge keys not null: {merge_not_null}")
+            print(f"✓ Unique merge keys: {unique_merge_keys}")
+
+            # Test merge key format
+            sample_merge_key = df["merge_key"].iloc[0]
+            print(f"✓ Sample merge key: {sample_merge_key}")
+        else:
+            print("⚠ Merge key field not found")
+
+        # Test 12: ΑρΠαρχ_Αρίθμηση
+        print("\nTest 12: ΑρΠαρχ_Αρίθμηση")
+        if "ΑρΠαρχ_Αρίθμηση" in df.columns:
+            numbering_not_null = len(df[df["ΑρΠαρχ_Αρίθμηση"].notna()])
+            print(f"✓ ΑρΠαρχ_Αρίθμηση not null: {numbering_not_null}")
+
+            # Test numbering logic
+            sample_supply = df["ΑρΠαροχής"].iloc[0]
+            supply_records = df[df["ΑρΠαροχής"] == sample_supply]
+            if len(supply_records) > 1:
+                numbering_range = supply_records["ΑρΠαρχ_Αρίθμηση"].tolist()
+                print(f"✓ Sample supply {sample_supply} numbering: {numbering_range}")
+                if numbering_range == list(range(1, len(numbering_range) + 1)):
+                    print("✓ ΑρΠαρχ_Αρίθμηση is sequential")
+                else:
+                    print("✗ ΑρΠαρχ_Αρίθμηση is not sequential")
+        else:
+            print("⚠ ΑρΠαρχ_Αρίθμηση field not found")
+
+        # Test 13: ΑρΠαρχ_Ομάδα
+        print("\nTest 13: ΑρΠαρχ_Ομάδα")
+        if "ΑρΠαρχ_Ομάδα" in df.columns:
+            group_not_null = len(df[df["ΑρΠαρχ_Ομάδα"].notna()])
+            unique_groups = df["ΑρΠαρχ_Ομάδα"].nunique()
+            unique_supplies = df["ΑρΠαροχής"].nunique()
+            print(f"✓ ΑρΠαρχ_Ομάδα not null: {group_not_null}")
+            print(f"✓ Unique groups: {unique_groups}")
+            print(f"✓ Unique supplies: {unique_supplies}")
+
+            # Test group logic
+            sample_group = df["ΑρΠαρχ_Ομάδα"].iloc[0]
+            group_records = df[df["ΑρΠαρχ_Ομάδα"] == sample_group]
+            print(f"✓ Sample group {sample_group} has {len(group_records)} records")
+
+            # Verify that same supply number gets same group
+            sample_supply = df["ΑρΠαροχής"].iloc[0]
+            supply_group = df[df["ΑρΠαροχής"] == sample_supply]["ΑρΠαρχ_Ομάδα"].iloc[0]
+            print(f"✓ Sample supply {sample_supply} belongs to group {supply_group}")
+        else:
+            print("⚠ ΑρΠαρχ_Ομάδα field not found")
         print("\nTest 9: Wrap Category Detection")
         if "raw_code" in df.columns:
             wrap_categories = df[df["raw_code"] == "Γ-wrap"]

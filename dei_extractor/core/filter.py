@@ -107,21 +107,27 @@ class FilterEkatharistikos(LoggerMixin):
         return filtered_df
 
     def remove_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Remove duplicate rows based on composite key or fallback to
-        full row comparison."""
+        """Remove duplicate rows based on merge_key or fallback to composite key."""
         # Ensure ID columns are strings to prevent sorting issues
         if "ΑρΠαροχής" in df.columns:
             df["ΑρΠαροχής"] = df["ΑρΠαροχής"].astype(str)
         if "ΑρΛογαριασμού" in df.columns:
             df["ΑρΛογαριασμού"] = df["ΑρΛογαριασμού"].astype(str)
 
-        dedup_key = [
-            c for c in ["ΑρΠαροχής", "ΑρΛογαριασμού", "ΗμΈκδοσης"] if c in df.columns
-        ]
+        # Use merge_key if available, otherwise fallback to composite key
+        dedup_key = []
+        if "merge_key" in df.columns:
+            dedup_key = ["merge_key"]
+        else:
+            dedup_key = [
+                c
+                for c in ["ΑρΠαροχής", "ΑρΛογαριασμού", "ΗμΈκδοσης"]
+                if c in df.columns
+            ]
 
         before_count = len(df)
 
-        if len(dedup_key) == 3:
+        if dedup_key:
             df = df.drop_duplicates(subset=dedup_key, keep="first")
             removed_count = before_count - len(df)
             self.logger.info(
@@ -134,12 +140,14 @@ class FilterEkatharistikos(LoggerMixin):
                 f"Dropped {removed_count} duplicate rows (full row comparison)"
             )
 
-        # Re-sort by ΑρΠαροχής after removing duplicates
-        if "ΑρΠαροχής" in df.columns:
-            df = df.sort_values(by=["ΑρΠαροχής"])
-            self.logger.info(
-                f"Re-sorted {len(df)} records by ΑρΠαροχής after deduplication"
-            )
+        # Re-sort using _start_date if available, otherwise by ΑρΠαροχής
+        sort_cols = ["ΑρΠαροχής"]
+        if "_start_date" in df.columns:
+            sort_cols.append("_start_date")
+        df = df.sort_values(by=sort_cols, kind="mergesort")
+        self.logger.info(
+            f"Re-sorted {len(df)} records by {', '.join(sort_cols)} after deduplication"
+        )
 
         return df
 

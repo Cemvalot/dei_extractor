@@ -363,11 +363,19 @@ class DEIExtractorEnhanced(LoggerMixin):
         address = match.group("addr").strip()
         combined_name_address = f"{name} {address}".strip()
 
+        # Parse period into start and end dates
+        from ..utils.validators import split_period
+
+        period_raw = match.group("period")
+        start_str, end_str = split_period(period_raw)
+
         return {
             "ΑρΠαροχής": str(match.group("par")),
             "ΑρΛογαριασμού": str(match.group("log")),
             "ΗμΈκδοσης": match.group("issued"),
-            "ΠερίοδοςΚατανάλωσης": match.group("period"),
+            "ΠερίοδοςΚατανάλωσης": period_raw,
+            "ΠερίοδοςΚατανάλωσης_Αρχική": start_str,
+            "ΠερίοδοςΚατανάλωσης_Τελική": end_str,
             "Ονοματεπώνυμο_Διεύθυνση": combined_name_address,
             "Πόλη": match.group("city").strip(),
         }

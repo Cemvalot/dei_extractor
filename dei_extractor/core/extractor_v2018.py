@@ -329,6 +329,12 @@ class DEIV2018Extractor(LoggerMixin):
                 2
             )  # The second number is the multiplier (1, 40, or 80)
 
+        # Parse period into start and end dates
+        from ..utils.validators import split_period
+
+        period_raw = period_block if period_block else None
+        start_str, end_str = split_period(period_raw) if period_raw else (None, None)
+
         # Map v2018 fields to modern layout field names
         return {
             "ΑρΠαροχής": supply_no.replace(" ", "").replace("-", "")
@@ -336,7 +342,9 @@ class DEIV2018Extractor(LoggerMixin):
             else None,
             "ΑρΛογαριασμού": account_no,  # Now available from v2018
             "ΗμΈκδοσης": _parse_date_iso(issue_raw) if issue_raw else None,
-            "ΠερίοδοςΚατανάλωσης": period_block if period_block else None,
+            "ΠερίοδοςΚατανάλωσης": period_raw,
+            "ΠερίοδοςΚατανάλωσης_Αρχική": start_str,
+            "ΠερίοδοςΚατανάλωσης_Τελική": end_str,
             "Ονοματεπώνυμο_Διεύθυνση": customer if customer else None,
             "Πόλη": city if city else None,
             "Τελευταία": current_reading,  # Now available from v2018

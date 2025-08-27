@@ -28,7 +28,9 @@ import pandas as pd
 import pdfplumber
 
 from ..utils.config import Config
+from ..utils.id_helpers import compute_arparchi_group_id
 from ..utils.logger import LoggerMixin
+from ..utils.validators import parse_ddmmyyyy
 from .extractor_modern import DEIModernExtractor
 from .extractor_v2018 import DEIV2018Extractor, detect_v2018_layout
 
@@ -136,10 +138,9 @@ class DEIUnifiedExtractor(LoggerMixin):
         # Create combined DataFrame
         if all_records:
             df = pd.DataFrame(all_records)
-            # Sort by ΑρΠαροχής
-            if "ΑρΠαροχής" in df.columns:
-                df = df.sort_values(by=["ΑρΠαροχής"])
-                logger.info(f"Sorted {len(df)} combined records by ΑρΠαροχής")
+            # Add merge fields and sort
+            df = self.add_merge_fields(df)
+            logger.info(f"Added merge fields to {len(df)} combined records")
         else:
             df = pd.DataFrame()
 
@@ -172,6 +173,7 @@ class DEIUnifiedExtractor(LoggerMixin):
         # Ensure all text columns are strings
         text_columns = [
             "ΑρΠαροχής",
+            "ΑρΠαρχ_Ομάδα",
             "ΑρΛογαριασμού",
             "Ονοματεπώνυμο_Διεύθυνση",
             "Πόλη",
@@ -184,6 +186,10 @@ class DEIUnifiedExtractor(LoggerMixin):
             "date_from",
             "date_to",
             "layout",
+            "ΠερίοδοςΚατανάλωσης_Αρχική",
+            "ΠερίοδοςΚατανάλωσης_Τελική",
+            "merge_key",
+            "ΑρΠαρχ_Αρίθμηση",
         ]
         for col in text_columns:
             if col in df.columns:
@@ -205,6 +211,9 @@ class DEIUnifiedExtractor(LoggerMixin):
             "date_from",
             "date_to",
             "layout",  # Internal field for layout detection
+            "_start_date",  # Internal field for sorting
+            "merge_key",  # Internal field for deduplication
+            "ΑρΠαρχ_Αρίθμηση",  # Internal field for sequencing
         ]
 
         # Create copies for output files
@@ -293,3 +302,50 @@ class DEIUnifiedExtractor(LoggerMixin):
     def reset_statistics(self):
         """Reset format statistics."""
         self.format_stats = {"v2018": 0, "modern": 0, "unknown": 0}
+
+    def add_merge_fields(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Add merge_key and ΑρΠαρχ_Αρίθμηση fields to the DataFrame."""
+        # Κανονικοποίηση τύπων
+        for col in [
+            "ΑρΠαροχής",
+            "ΠερίοδοςΚατανάλωσης_Αρχική",
+            "ΠερίοδοςΚατανάλωσης_Τελική",
+        ]:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.strip()
+
+        # merge_key
+        if set(
+            ["ΑρΠαροχής", "ΠερίοδοςΚατανάλωσης_Αρχική", "ΠερίοδοςΚατανάλωσης_Τελική"]
+        ).issubset(df.columns):
+            df["merge_key"] = (
+                df["ΑρΠαροχής"]
+                + "__"
+                + df["ΠερίοδοςΚατανάλωσης_Αρχική"]
+                + "__"
+                + df["ΠερίοδοςΚατανάλωσης_Τελική"]
+            )
+        else:
+            df["merge_key"] = pd.NA
+
+        # Parse dates για σωστή ταξινόμηση
+        if "ΠερίοδοςΚατανάλωσης_Αρχική" in df.columns:
+            df["_start_date"] = df["ΠερίοδοςΚατανάλωσης_Αρχική"].apply(parse_ddmmyyyy)
+        else:
+            df["_start_date"] = pd.NaT
+
+        # ΑρΠαρχ_Αρίθμηση: ταξινόμηση ανά ΑρΠαροχής, start_date
+        if "ΑρΠαροχής" in df.columns:
+            df = df.sort_values(by=["ΑρΠαροχής", "_start_date"], kind="mergesort")
+            df["ΑρΠαρχ_Αρίθμηση"] = df.groupby("ΑρΠαροχής").cumcount() + 1
+
+        # ΑρΠαρχ_Ομάδα: dense rank ανά μοναδικό ΑρΠαροχής
+        if "ΑρΠαροχής" in df.columns:
+            df["ΑρΠαρχ_Ομάδα"] = compute_arparchi_group_id(df["ΑρΠαροχής"])
+            # Βάλε τη στήλη αμέσως μετά το ΑρΠαροχής για εργονομία
+            cols = list(df.columns)
+            i = cols.index("ΑρΠαροχής")
+            cols.insert(i + 1, cols.pop(cols.index("ΑρΠαρχ_Ομάδα")))
+            df = df[cols]
+
+        return df

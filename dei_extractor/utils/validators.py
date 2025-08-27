@@ -7,6 +7,8 @@ used in the DEI extraction process.
 """
 
 import csv
+import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -168,3 +170,28 @@ def validate_directory_path(
         raise ValidationError(f"Path is not a directory: {dir_path}")
 
     return True
+
+
+# Date parsing helper functions
+PERIOD_SPLIT = re.compile(r"(\d{2}\.\d{2}\.\d{4})-(\d{2}\.\d{2}\.\d{4})")
+
+
+def split_period(period: str):
+    """
+    Επιστρέφει (start_str, end_str) σε μορφή dd.mm.yyyy.
+    Αν δεν ταιριάζει, επιστρέφει (None, None).
+    """
+    if not isinstance(period, str):
+        return None, None
+    m = PERIOD_SPLIT.fullmatch(period.strip())
+    if not m:
+        return None, None
+    return m.group(1), m.group(2)
+
+
+def parse_ddmmyyyy(s: str):
+    """Επιστρέφει datetime.date από dd.mm.yyyy ή None."""
+    try:
+        return datetime.strptime(s, "%d.%m.%Y").date()
+    except Exception:
+        return None
