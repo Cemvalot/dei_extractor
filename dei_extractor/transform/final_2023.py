@@ -569,6 +569,12 @@ def _load_classification_mapping(path: Optional[str]) -> List[Tuple[str, str, st
     return []
 
 
+def rename_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename specific columns to match the required format."""
+    rename_map = {"ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1": "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023 Πραγματικό"}
+    return df.rename(columns=rename_map)
+
+
 def format_dates(df: pd.DataFrame) -> pd.DataFrame:
     """Format date columns to dd/mm/yyyy string format."""
     for col in ["ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ", "ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ "]:
@@ -595,10 +601,13 @@ def write_final(df: pd.DataFrame, path: str, decimals_mode: str = "round"):
         f"Writing final dataset to {path} with {decimals_mode} mode for 2-decimal formatting"
     )
 
-    # 1. enforce numbers 2 decimals
+    # 1. rename columns
+    df = rename_columns(df)
+
+    # 2. enforce numbers 2 decimals
     df = enforce_two_decimals(df, mode=decimals_mode)
 
-    # 2. format dates
+    # 3. format dates
     df = format_dates(df)
 
     # 3. export with Excel formatting

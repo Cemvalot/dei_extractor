@@ -182,3 +182,33 @@ def test_date_formatting():
 
     # Check that other columns are unchanged
     assert result["other_col"].iloc[0] == 1
+
+
+def test_column_renaming():
+    """Test that specific columns are renamed correctly."""
+    from dei_extractor.transform.final_2023 import rename_columns
+
+    df = pd.DataFrame(
+        {
+            "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1": [100, 200, 300],
+            "other_col": [1, 2, 3],
+            "another_col": ["a", "b", "c"],
+        }
+    )
+
+    result = rename_columns(df)
+
+    # Check that the specific column was renamed
+    assert "1.1.2023 Πραγματικό" in result.columns
+    assert "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1" not in result.columns
+
+    # Check that the values are preserved
+    assert result["1.1.2023 Πραγματικό"].iloc[0] == 100
+    assert result["1.1.2023 Πραγματικό"].iloc[1] == 200
+    assert result["1.1.2023 Πραγματικό"].iloc[2] == 300
+
+    # Check that other columns are unchanged
+    assert "other_col" in result.columns
+    assert "another_col" in result.columns
+    assert result["other_col"].iloc[0] == 1
+    assert result["another_col"].iloc[0] == "a"
