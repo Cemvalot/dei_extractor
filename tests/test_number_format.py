@@ -149,3 +149,36 @@ def test_greek_number_formatting():
     pd.testing.assert_series_equal(
         result["mixed_greek"], expected_mixed, check_dtype=False
     )
+
+
+def test_date_formatting():
+    """Test that date columns are formatted to dd/mm/yyyy string format."""
+    from dei_extractor.transform.final_2023 import format_dates
+
+    df = pd.DataFrame(
+        {
+            "ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ": ["2023-01-01", "2023-06-15", "2023-12-31"],
+            "ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ": ["2023-01-31", "2023-06-30", "2023-12-31"],
+            "other_col": [1, 2, 3],
+        }
+    )
+
+    result = format_dates(df)
+
+    # Check that date columns are formatted as dd/mm/yyyy strings
+    expected_start = pd.Series(
+        ["01/01/2023", "15/06/2023", "31/12/2023"], name="ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ "
+    )
+    expected_end = pd.Series(
+        ["31/01/2023", "30/06/2023", "31/12/2023"], name="ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ "
+    )
+
+    pd.testing.assert_series_equal(
+        result["ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ "], expected_start, check_dtype=False
+    )
+    pd.testing.assert_series_equal(
+        result["ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ "], expected_end, check_dtype=False
+    )
+
+    # Check that other columns are unchanged
+    assert result["other_col"].iloc[0] == 1

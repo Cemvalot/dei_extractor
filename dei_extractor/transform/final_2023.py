@@ -569,6 +569,17 @@ def _load_classification_mapping(path: Optional[str]) -> List[Tuple[str, str, st
     return []
 
 
+def format_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """Format date columns to dd/mm/yyyy string format."""
+    for col in ["ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ", "ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ "]:
+        if col in df.columns:
+            # Convert to datetime (if not already)
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+            # Display as string dd/mm/yyyy
+            df[col] = df[col].dt.strftime("%d/%m/%Y")
+    return df
+
+
 def write_final(df: pd.DataFrame, path: str, decimals_mode: str = "round"):
     """
     Write final dataset to Excel file with proper formatting and number formatting.
@@ -584,10 +595,13 @@ def write_final(df: pd.DataFrame, path: str, decimals_mode: str = "round"):
         f"Writing final dataset to {path} with {decimals_mode} mode for 2-decimal formatting"
     )
 
-    # Apply number formatting to 2 decimals
+    # 1. enforce numbers 2 decimals
     df = enforce_two_decimals(df, mode=decimals_mode)
 
-    # Create Excel writer with xlsxwriter engine
+    # 2. format dates
+    df = format_dates(df)
+
+    # 3. export with Excel formatting
     with pd.ExcelWriter(path, engine="xlsxwriter") as writer:
         # Write main data
         df.to_excel(writer, sheet_name="Sheet1", index=False)
@@ -608,7 +622,7 @@ def write_final(df: pd.DataFrame, path: str, decimals_mode: str = "round"):
         # Freeze top row
         worksheet.freeze_panes(1, 0)
 
-        # Set column widths based on content and apply number formatting
+        # Set column widths and apply number formatting
         numfmt_2dec = workbook.add_format({"num_format": "0.00"})
         numfmt_int = workbook.add_format({"num_format": "0"})
         for col_num, column in enumerate(df.columns):
