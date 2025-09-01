@@ -236,6 +236,13 @@ Examples:
         "--class-mapping", help="Path to custom classification mapping CSV file"
     )
 
+    parser.add_argument(
+        "--decimals-mode",
+        choices=["round", "truncate"],
+        default="round",
+        help="Format numeric values to 2 decimals using rounding (default) or truncation",
+    )
+
     args = parser.parse_args()
 
     # Setup logging
@@ -264,7 +271,7 @@ Examples:
 
         # Write output
         logger.info("Writing final dataset...")
-        write_final(final_df, args.output)
+        write_final(final_df, args.output, decimals_mode=args.decimals_mode)
 
         # Validate ΦΟΠ classification
         validate_fop_classification(final_df)

@@ -569,15 +569,23 @@ def _load_classification_mapping(path: Optional[str]) -> List[Tuple[str, str, st
     return []
 
 
-def write_final(df: pd.DataFrame, path: str):
+def write_final(df: pd.DataFrame, path: str, decimals_mode: str = "round"):
     """
-    Write final dataset to Excel file with proper formatting.
+    Write final dataset to Excel file with proper formatting and number formatting.
 
     Args:
         df: Final DataFrame
         path: Output file path
+        decimals_mode: "round" (default) or "truncate" for 2-decimal formatting
     """
-    logger.info(f"Writing final dataset to {path}")
+    from dei_extractor.utils.number_format import enforce_two_decimals
+
+    logger.info(
+        f"Writing final dataset to {path} with {decimals_mode} mode for 2-decimal formatting"
+    )
+
+    # Apply number formatting to 2 decimals
+    df = enforce_two_decimals(df, mode=decimals_mode)
 
     # Create Excel writer with xlsxwriter engine
     with pd.ExcelWriter(path, engine="xlsxwriter") as writer:
@@ -600,10 +608,35 @@ def write_final(df: pd.DataFrame, path: str):
         # Freeze top row
         worksheet.freeze_panes(1, 0)
 
-        # Set column widths based on content
+        # Set column widths based on content and apply number formatting
+        numfmt_2dec = workbook.add_format({"num_format": "0.00"})
+        numfmt_int = workbook.add_format({"num_format": "0"})
         for col_num, column in enumerate(df.columns):
             max_length = max(df[column].astype(str).map(len).max(), len(str(column)))
-            worksheet.set_column(col_num, col_num, min(max_length + 2, 50))
+            if pd.api.types.is_numeric_dtype(df[column]):
+                # Check if column has decimal values to determine format
+                has_decimals = (
+                    df[column]
+                    .apply(
+                        lambda x: not pd.isna(x) and x != int(x)
+                        if isinstance(x, (int, float))
+                        else False
+                    )
+                    .any()
+                )
+                if has_decimals:
+                    # Apply 2-decimal format for columns with decimal values
+                    worksheet.set_column(
+                        col_num, col_num, min(max_length + 2, 50), numfmt_2dec
+                    )
+                else:
+                    # Apply integer format for columns with only whole numbers
+                    worksheet.set_column(
+                        col_num, col_num, min(max_length + 2, 50), numfmt_int
+                    )
+            else:
+                # Regular formatting for non-numeric columns
+                worksheet.set_column(col_num, col_num, min(max_length + 2, 50))
 
         # Create metadata sheet
         _create_metadata_sheet(workbook)
