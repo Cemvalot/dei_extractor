@@ -54,6 +54,24 @@ def parse_arguments() -> argparse.Namespace:
         help="Apply Εκαθαριστικός filtering to extracted data",
     )
     parser.add_argument(
+        "--year",
+        type=int,
+        default=2023,
+        help="Anchor year for downstream span selection (default: 2023)",
+    )
+    parser.add_argument(
+        "--window-days",
+        type=int,
+        default=60,
+        help="± window around anchors in days (default: 60)",
+    )
+    parser.add_argument(
+        "--target-span-days",
+        type=int,
+        default=365,
+        help="Target total span in days (default: 365)",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",

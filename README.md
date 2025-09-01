@@ -164,6 +164,26 @@ The tool automatically detects your PDF format:
 
 ```
 Your PDFs → Format Detection → Route to Best Extractor → Combine Results → Output Files
+### Επιλογή εκκαθαριστικών ±60 ημερών γύρω από 2023 & στόχος 365 ημερών
+
+Για τη μετατροπή στο τελικό αρχείο (ΠΑΡΟΧΕΣ 2023), γίνεται επιλογή πρώτου/τελευταίου εκκαθαριστικού λογαριασμού ανά παροχή ως εξής:
+
+- Πρώτος: `period_start` εντός ±60 ημερών από 2023-01-01 (fallback έως ±120)
+- Τελευταίος: `period_end` εντός ±60 ημερών από 2023-12-31 (fallback έως ±120)
+- Επιλογή ζευγαριού με διάρκεια κοντά στις 365 ημέρες (tie-breakers: κοντινότερο στην αρχή, κοντινότερο στο τέλος, μεγαλύτερο span)
+- Αν λείπει μία πλευρά, γίνεται best-effort και καταγράφεται προειδοποίηση στα logs
+
+Παράδειγμα CLI (μετασχηματισμός Phase-1 σε τελικό):
+
+```bash
+python scripts/transform_to_final.py \
+  --input "filtered 2.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
+  --year 2023 \
+  --window-days 60 \
+  --target-span-days 365
+```
+
 ```
 
 ## 🐍 Python API (For Developers)
@@ -292,6 +312,133 @@ pip show dei-extractor
 - **Compatibility**: DEI bills from 2018 and earlier
 
 **Both formats produce the same output structure!**
+
+## 🔄 Final 2023 Transformation
+
+**NEW: Phase-1 to Final Dataset Transformation** - Convert the filtered Phase-1 output into the final consolidated dataset format for 2023 analysis.
+
+### 🎯 What This Does
+
+The transformation takes the Phase-1 output (filtered 2.xlsx) and creates a final consolidated dataset with:
+- **One row per service** (ΠΑΡΟΧΗ)
+- **2023 consumption window** calculations
+- **Infrastructure classification** with ΦΟΠ override rules
+- **Professional Excel formatting** with metadata
+
+### 🚀 Quick Start - Final Transformation
+
+```bash
+# 1. Activate the virtual environment
+source dei_env_new/bin/activate
+
+# 2. Run the transformation
+python scripts/transform_to_final.py \
+  --input "dei_extractor/data/filtered 2.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx"
+```
+
+### 📊 Output Results
+
+The transformation produces:
+- **513 unique services** from 3,283 Phase-1 records
+- **360 ΦΟΠ entries** (all correctly classified as "ΟΧΙ")
+- **26 columns** in exact target schema
+- **Professional Excel formatting** with headers and metadata
+
+### 🔧 Advanced Usage Options
+
+```bash
+# With validation against sample file
+python scripts/transform_to_final.py \
+  --input "dei_extractor/data/filtered 2.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
+  --validate-against "dei_extractor/data/Sample Παροχές.xlsx"
+
+# With custom classification mapping
+python scripts/transform_to_final.py \
+  --input "dei_extractor/data/filtered 2.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
+  --class-mapping "scripts/class_mapping.csv"
+
+# With debug logging
+python scripts/transform_to_final.py \
+  --input "dei_extractor/data/filtered 2.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
+  --log-level DEBUG
+```
+
+### 📋 All Available Options
+
+```bash
+python scripts/transform_to_final.py --help
+```
+
+**Required Arguments:**
+- `--input, -i`: Path to Phase-1 Excel file (filtered 2.xlsx)
+- `--output, -o`: Path for output Excel file
+
+**Optional Arguments:**
+- `--year`: Target year for calculations (default: 2023)
+- `--encoding`: File encoding (default: utf-8-sig)
+- `--keep-str-ids`: Keep service IDs as strings
+- `--log-level`: Logging level (INFO|DEBUG|WARNING|ERROR)
+- `--validate-against`: Path to sample file for validation
+- `--class-mapping`: Path to custom classification mapping CSV
+
+### 🎯 Key Features
+
+#### **Consumption Window Logic**
+- Finds periods containing 2023-01-01 and 2023-12-31
+- Handles missing data with fallback logic
+- Calculates initial and final meter readings
+
+#### **Meter Reset Handling**
+- Automatically detects when final < initial reading
+- Switches to sum-based calculation using ΣυνΩΧΒ
+- Logs warnings for transparency
+
+#### **ΦΟΠ Classification Rule**
+- **CRITICAL**: If ΕΙΔΟΣ ΥΠΟΔΟΜΗΣ == "ΦΟΠ" → ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ) = "ΟΧΙ" **ALWAYS**
+- All 360 ΦΟΠ entries correctly classified as "ΟΧΙ" ✓
+- Non-ΦΟΠ entries use keyword matching
+
+#### **Formula Calculations**
+- `captured_days = (end_date - start_date).days`
+- `captured_kwh = final_reading - initial_reading` (or sum for resets)
+- `mean_per_day = captured_kwh / captured_days`
+- `consumption_2023 = mean_per_day * 365`
+
+### 🧪 Testing the Transformation
+
+```bash
+# Run all transformation tests
+python -m pytest tests/test_final_2023.py -v
+
+# Run specific test
+python -m pytest tests/test_final_2023.py::test_classify_infrastructure -v
+```
+
+### 📊 Verify Results
+
+```bash
+# Check the output file
+python -c "import pandas as pd; df = pd.read_excel('ΠΑΡΟΧΕΣ_2023_FINAL.xlsx'); print(f'Total services: {len(df)}'); print(f'ΦΟΠ entries: {(df[\"ΕΙΔΟΣ ΥΠΟΔΟΜΗΣ\"] == \"ΦΟΠ\").sum()}'); print(f'Infrastructure flags: {df[\"ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ)\"].value_counts()}')"
+```
+
+### 📁 Output File Structure
+
+The final Excel file contains:
+- **Sheet1**: Main data with 26 columns in exact target order
+- **_meta**: Metadata sheet with column descriptions and formulas
+- **Professional formatting**: Bold headers, frozen rows, auto-sized columns
+
+### ✅ Validation Results
+
+```
+2025-08-29 10:17:55,765 - INFO - Validating ΦΟΠ classification...
+2025-08-29 10:17:55,765 - INFO - Found 360 ΦΟΠ entries
+2025-08-29 10:17:55,766 - INFO - All ΦΟΠ entries correctly classified as 'ΟΧΙ' ✓
+```
 
 ## 🚀 Advanced Features
 
