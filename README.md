@@ -333,7 +333,7 @@ source dei_env_new/bin/activate
 
 # 2. Run the transformation
 python scripts/transform_to_final.py \
-  --input "dei_extractor/data/filtered 2.xlsx" \
+  --input "dei_extractor/data/filtered.xlsx" \
   --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx"
 ```
 
@@ -350,19 +350,19 @@ The transformation produces:
 ```bash
 # With validation against sample file
 python scripts/transform_to_final.py \
-  --input "dei_extractor/data/filtered 2.xlsx" \
+  --input "dei_extractor/data/filtered.xlsx" \
   --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
   --validate-against "dei_extractor/data/Sample Παροχές.xlsx"
 
 # With custom classification mapping
 python scripts/transform_to_final.py \
-  --input "dei_extractor/data/filtered 2.xlsx" \
+  --input "dei_extractor/data/filtered.xlsx" \
   --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
   --class-mapping "scripts/class_mapping.csv"
 
 # With debug logging
 python scripts/transform_to_final.py \
-  --input "dei_extractor/data/filtered 2.xlsx" \
+  --input "dei_extractor/data/filtered.xlsx" \
   --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
   --log-level DEBUG
 ```
