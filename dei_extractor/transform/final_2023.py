@@ -41,8 +41,6 @@ TARGET_COLUMNS = [
     "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1",
     "ΚΑΤΑΝΑΛΩΣΗ 31.12.2023",
     "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH",
-    "Unnamed: 23",
-    "Unnamed: 24",
     "Unnamed: 25",
 ]
 
@@ -347,8 +345,6 @@ def _compute_service_metrics(
         "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1": reading_at_2023_01_01_abs,
         "ΚΑΤΑΝΑΛΩΣΗ 31.12.2023": reading_at_2023_12_31,
         "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH": consumption_2023,  # Duplicate as per sample
-        "Unnamed: 23": np.nan,
-        "Unnamed: 24": subtype,
         "Unnamed: 25": sector,
     }
 
@@ -747,8 +743,6 @@ def _create_metadata_sheet(workbook):
             "Consumption difference",
             "Duplicate of consumption_2023",
         ],
-        ["Unnamed: 23", "Classification slot 1", "Reserved for future use"],
-        ["Unnamed: 24", "Classification subtype", "Specific facility subtype"],
         ["Unnamed: 25", "Sector classification", "High-level sector bucket"],
     ]
 

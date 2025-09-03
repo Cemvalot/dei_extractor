@@ -321,14 +321,42 @@ def test_write_final(sample_phase1_data):
         assert Path(tmp.name).exists()
 
         # Read back and verify
-        with pd.ExcelFile(tmp.name) as xls:
-            assert "Sheet1" in xls.sheet_names
-            assert "_meta" in xls.sheet_names
+        xls = pd.ExcelFile(tmp.name)
+        assert "Sheet1" in xls.sheet_names
+        assert "_meta" in xls.sheet_names
 
-            # Check main data
-            df_read = pd.read_excel(xls, "Sheet1")
-            assert len(df_read) == len(final_df)
-            assert list(df_read.columns) == list(final_df.columns)
+        # Check main data
+        df_read = pd.read_excel(tmp.name, "Sheet1")
+        assert len(df_read) == len(final_df)
+
+        # Check that the expected columns are present (after renaming)
+        expected_columns = [
+            "Α/Α",
+            "ΠΑΡΟΧΗ",
+            "ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ",
+            "ΟΝΟΜΑ ",
+            "ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ)",
+            "ΕΙΔΟΣ ΥΠΟΔΟΜΗΣ",
+            "ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
+            "ΚΑΤΑΓΡΑΦΗ ΣΤΗΝ ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ",
+            "ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
+            "ΚΑΤΑΓΡΑΦΗ ΣΤΗΝ ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
+            "ΣΧΟΛΙΟ",
+            "ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/23",
+            "ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/2023",
+            "ΚΑΤΑΓΡΑΦΟΜΕΝΗ ΠΕΡΙΟΔΟΣ",
+            "ΑΡ. ΗΜΕΡΩΝ 2019",
+            "ΚΑΤΑΝΑΛΩΣΗ ΚΑΤΑΓΡΑΦΟΜΕΝΗΣ ΠΕΡ. KWH",
+            "ΜΕΣΗ ΚΑΤΑΝΑΛΩΣΗ/ΗΜ.",
+            "ΚΑΤΑΝΑΛΩΣΗ 2023 KWH",
+            "ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.2023",
+            "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023",
+            "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023 Πραγματικό",
+            "ΚΑΤΑΝΑΛΩΣΗ 31.12.2023",
+            "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH",
+            "Unnamed: 25",
+        ]
+        assert list(df_read.columns) == expected_columns
 
         os.unlink(tmp.name)
 
@@ -374,11 +402,9 @@ def test_integration_end_to_end(sample_phase1_file):
                 "ΚΑΤΑΝΑΛΩΣΗ 2023 KWH",
                 "ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.2023",
                 "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023",
-                "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1",
+                "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023 Πραγματικό",
                 "ΚΑΤΑΝΑΛΩΣΗ 31.12.2023",
                 "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH",
-                "Unnamed: 23",
-                "Unnamed: 24",
                 "Unnamed: 25",
             ]
 
