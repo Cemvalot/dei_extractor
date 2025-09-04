@@ -103,16 +103,61 @@ webapp/
 ## 🔧 Development
 
 ### Local Development (without Docker)
+
+#### Prerequisites
 ```bash
+# Activate the virtual environment (if using one)
+source ../dei_env_new/bin/activate
+
 # Install dependencies
 pip install -r requirements.txt
+```
 
+#### Starting the Backend (FastAPI)
+```bash
+# Option 1: Using Makefile (recommended)
+make dev-fastapi
+
+# Option 2: Direct command
+cd .. && python -m uvicorn webapp.server.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+The backend will be available at:
+- **Web Interface**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
+- **API Endpoints**: http://localhost:8000/api/jobs/
+
+#### Starting the Frontend (Streamlit)
+```bash
 # Run Streamlit locally
 make dev
-
-# Run FastAPI locally
-make dev-fastapi
 ```
+
+The Streamlit interface will be available at http://localhost:8501
+
+#### Starting the Next.js Frontend
+```bash
+# Navigate to the frontend directory
+cd ../frontend
+
+# Install dependencies (first time only)
+npm install
+
+# Start the development server
+npm run dev
+```
+
+The Next.js frontend will be available at http://localhost:3000
+
+**Note**: The Next.js frontend is designed to work with the FastAPI backend. Make sure both are running:
+1. Backend: `make dev-fastapi` (from webapp directory)
+2. Frontend: `npm run dev` (from frontend directory)
+
+#### Troubleshooting
+- **Backend not starting**: Make sure you're in the correct directory and have activated the virtual environment
+- **CORS errors**: The backend is configured to accept requests from `http://localhost:3000`
+- **Port conflicts**: Backend uses port 8000, frontend uses port 3000
+- **API not found**: Check that the backend is running and accessible at http://localhost:8000/docs
 
 ### Docker Development
 ```bash
