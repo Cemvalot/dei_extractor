@@ -1,0 +1,32 @@
+:80, :443 {
+    tls internal
+
+    # Replace <HASHED_PASSWORD> with output of: docker run --rm caddy:2 caddy hash-password --plaintext 'YourStrongPassword'
+    basicauth /* {
+        admin $2a$14$a.6N94jcU7tJYFRSV4rug.jeLCpzEcIlb/x9p1WyJwfiD2S6uO82K
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; connect-src 'self' http://localhost:8000; style-src 'self' 'unsafe-inline'; object-src 'none'; frame-ancestors 'none'"
+    }
+
+    @uploads {
+        method POST
+        path /api/*
+    }
+    request_body @uploads {
+        max_size 100MB
+    }
+
+    handle_path /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle {
+        reverse_proxy frontend:3000
+    }
+}

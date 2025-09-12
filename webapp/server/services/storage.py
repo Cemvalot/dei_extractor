@@ -112,7 +112,7 @@ class StorageService:
         return file_path
 
     def extract_zip_file(self, zip_path: Path, run_dir: Path) -> List[Path]:
-        """Extract a ZIP file to the input directory.
+        """Extract a ZIP file to the input directory using safe extraction.
 
         Args:
             zip_path: Path to the ZIP file
@@ -121,20 +121,20 @@ class StorageService:
         Returns:
             List of extracted PDF file paths
         """
-        import zipfile
+        from utils.zip_safe import safe_extract
 
         input_dir = run_dir / "input"
         extracted_files = []
 
         try:
-            with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                for file_info in zip_ref.filelist:
-                    if file_info.filename.lower().endswith(".pdf"):
-                        # Extract to input directory
-                        zip_ref.extract(file_info, input_dir)
-                        extracted_path = input_dir / file_info.filename
-                        extracted_files.append(extracted_path)
-                        logger.info(f"Extracted PDF: {extracted_path}")
+            # Use safe extraction to prevent zip-slip attacks
+            safe_extract(zip_path, input_dir)
+
+            # Find all extracted PDF files
+            for file_path in input_dir.rglob("*.pdf"):
+                if file_path.is_file():
+                    extracted_files.append(file_path)
+                    logger.info(f"Extracted PDF: {file_path}")
 
         except Exception as e:
             logger.error(f"Error extracting ZIP file {zip_path}: {e}")

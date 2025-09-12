@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+# System deps for OCR & PDFs
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr tesseract-ocr-ell poppler-utils qpdf \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy project and requirements
+COPY dei_extractor /app/dei_extractor
+COPY webapp /app/webapp
+COPY requirements.txt /app/requirements.txt
+COPY setup.py /app/setup.py
+COPY pyproject.toml /app/pyproject.toml
+COPY README.md /app/README.md
+
+# Python deps: install main requirements and webapp requirements
+RUN pip install --no-cache-dir -r /app/requirements.txt \
+ && pip install --no-cache-dir -r /app/webapp/requirements.txt \
+ && pip install --no-cache-dir /app
+
+# Runtime env
+ENV PYTHONUNBUFFERED=1 \
+    LOG_LEVEL=INFO \
+    RETENTION_HOURS=24 \
+    MAX_FILES=50 \
+    MAX_UPLOAD_MB=100
+
+WORKDIR /app/webapp/server
+EXPOSE 8000
+CMD ["uvicorn","main:app","--host","0.0.0.0","--port","8000"]

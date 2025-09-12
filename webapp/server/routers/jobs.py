@@ -4,21 +4,51 @@ Clean version of jobs router with working endpoints.
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-
-from ..models.requests import ProcessingOptions
-from ..models.responses import ErrorResponse, JobStatus
-from ..services.extractor_service import ExtractorService
-from ..services.storage import StorageService
-from ..services.zipping import ZippingService
+from models.requests import ProcessingOptions
+from models.responses import ErrorResponse, JobStatus
+from services.extractor_service import ExtractorService
+from services.storage import StorageService
+from services.zipping import ZippingService
 
 logger = logging.getLogger(__name__)
 
+# Environment variables for upload limits
+MAX_FILES = int(os.getenv("MAX_FILES", "50"))
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "100"))
+ALLOWED_EXTS = {".pdf", ".zip"}
+
 router = APIRouter()
+
+
+async def _validate_uploads(files: List[UploadFile]):
+    """Validate uploaded files for count, size, and allowed extensions."""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded")
+
+    if len(files) > MAX_FILES:
+        raise HTTPException(status_code=400, detail=f"Too many files (max {MAX_FILES})")
+
+    total_bytes = 0
+    for f in files:
+        name = f.filename or ""
+        ext = Path(name).suffix.lower()
+        if ext not in ALLOWED_EXTS:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+
+        blob = await f.read()
+        total_bytes += len(blob)
+        await f.seek(0)
+
+    if total_bytes > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=400, detail=f"Upload too large (> {MAX_UPLOAD_MB}MB)"
+        )
 
 
 @router.get("/healthz")
@@ -35,6 +65,9 @@ async def process_files(
     options: ProcessingOptions = ProcessingOptions(),
 ) -> JobStatus:
     """Process uploaded files synchronously."""
+
+    # Validate uploads first
+    await _validate_uploads(files)
 
     # Initialize services
     storage_service = StorageService()
@@ -114,20 +147,8 @@ async def process_files_with_progress(
 ) -> StreamingResponse:
     """Process uploaded files with real-time progress updates via Server-Sent Events."""
 
-    # Validate files
-    if not files:
-        raise HTTPException(status_code=400, detail="No files uploaded")
-
-    # Validate file types
-    for file in files:
-        if not file.filename:
-            continue
-        file_ext = Path(file.filename).suffix.lower()
-        if file_ext not in [".pdf", ".zip"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid file type: {file_ext}. Only .pdf and .zip files are allowed.",
-            )
+    # Validate uploads first
+    await _validate_uploads(files)
 
     # Initialize services
     storage_service = StorageService()
@@ -298,6 +319,9 @@ async def process_and_download(
     language: str = Form(default="en", description="UI language (en or gr)"),
 ) -> StreamingResponse:
     """Process files and return results as ZIP download."""
+
+    # Validate uploads first
+    await _validate_uploads(files)
 
     # Initialize services
     storage_service = StorageService()
