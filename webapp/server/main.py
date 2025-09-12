@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from models.responses import HealthResponse
 from routers.jobs import router as jobs_router
+from routers.transform import router as transform_router
 from services.extractor_service import ExtractorService
 from services.language_service import LanguageService
 
@@ -108,6 +109,7 @@ if static_dir.exists():
 
 # Include routers
 app.include_router(jobs_router, prefix="/api/jobs", tags=["jobs"])
+app.include_router(transform_router, prefix="/api/transform", tags=["transform"])
 
 
 @app.get("/", response_class=FileResponse)

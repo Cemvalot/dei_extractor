@@ -8,7 +8,8 @@ import { HistoryList } from '@/components/HistoryList';
 import { useExtractorStore } from '@/store/useExtractorStore';
 import { getTranslation, getCurrentLanguage, setLanguage } from '@/lib/i18n';
 import { Language } from '@/lib/types';
-import { Globe } from 'lucide-react';
+import { Globe, FileText } from 'lucide-react';
+import Link from 'next/link';
 
 export default function HomePage() {
   const { setLanguage: setStoreLanguage } = useExtractorStore();
@@ -47,16 +48,25 @@ export default function HomePage() {
                 {getTranslation('appSubtitle', displayLanguage)}
               </p>
             </div>
-            <button
-              onClick={handleLanguageToggle}
-              className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
-              aria-label="Toggle language"
-            >
-              <Globe className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                {getTranslation('languageSwitch', displayLanguage)}
-              </span>
-            </button>
+            <div className="flex items-center space-x-4">
+              <Link
+                href="/transform"
+                className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
+              >
+                <FileText className="h-4 w-4" />
+                <span className="text-sm font-medium">Transform</span>
+              </Link>
+              <button
+                onClick={handleLanguageToggle}
+                className="flex items-center space-x-2 px-3 py-2 rounded-md hover:bg-accent transition-colors"
+                aria-label="Toggle language"
+              >
+                <Globe className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {getTranslation('languageSwitch', displayLanguage)}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
