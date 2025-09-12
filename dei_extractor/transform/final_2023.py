@@ -16,33 +16,39 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Target column names exactly as specified
-TARGET_COLUMNS = [
-    "Α/Α",
-    "ΠΑΡΟΧΗ",
-    "ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ",
-    "ΟΝΟΜΑ ",
-    "ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ)",
-    "ΕΙΔΟΣ ΥΠΟΔΟΜΗΣ",
-    "ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
-    "ΚΑΤΑΓΡΑΦΗ ΣΤΗΝ ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ",
-    "ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
-    "ΚΑΤΑΓΡΑΦΗ ΣΤΗΝ ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
-    "ΣΧΟΛΙΟ",
-    "ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/23",
-    "ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/2023",
-    "ΚΑΤΑΓΡΑΦΟΜΕΝΗ ΠΕΡΙΟΔΟΣ",
-    "ΑΡ. ΗΜΕΡΩΝ 2019",
-    "ΚΑΤΑΝΑΛΩΣΗ ΚΑΤΑΓΡΑΦΟΜΕΝΗΣ ΠΕΡ. KWH",
-    "ΜΕΣΗ ΚΑΤΑΝΑΛΩΣΗ/ΗΜ.",
-    "ΚΑΤΑΝΑΛΩΣΗ 2023 KWH",
-    "ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.2023",
-    "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023",
-    "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1",
-    "ΚΑΤΑΝΑΛΩΣΗ 31.12.2023",
-    "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH",
-    "Unnamed: 25",
-]
+
+def get_target_columns(year: int) -> List[str]:
+    """Generate target column names with dynamic year formatting."""
+    return [
+        "Α/Α",
+        "ΠΑΡΟΧΗ",
+        "ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ",
+        "ΟΝΟΜΑ ",
+        "ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ)",
+        "ΕΙΔΟΣ ΥΠΟΔΟΜΗΣ",
+        "ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
+        "ΚΑΤΑΓΡΑΦΗ ΣΤΗΝ ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ",
+        "ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
+        "ΚΑΤΑΓΡΑΦΗ ΣΤΗΝ ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
+        "ΣΧΟΛΙΟ",
+        f"ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/{year}",
+        f"ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/{year}",
+        "ΚΑΤΑΓΡΑΦΟΜΕΝΗ ΠΕΡΙΟΔΟΣ",
+        "ΑΡ. ΗΜΕΡΩΝ 2019",
+        "ΚΑΤΑΝΑΛΩΣΗ ΚΑΤΑΓΡΑΦΟΜΕΝΗΣ ΠΕΡ. KWH",
+        "ΜΕΣΗ ΚΑΤΑΝΑΛΩΣΗ/ΗΜ.",
+        f"ΚΑΤΑΝΑΛΩΣΗ {year} KWH",
+        f"ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.{year}",
+        f"ΚΑΤΑΝΑΛΩΣΗ 1.1.{year}",
+        f"ΚΑΤΑΝΑΛΩΣΗ 1.1.{year}.1",
+        f"ΚΑΤΑΝΑΛΩΣΗ 31.12.{year}",
+        "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH",
+        "Unnamed: 25",
+    ]
+
+
+# Target column names exactly as specified (for backward compatibility)
+TARGET_COLUMNS = get_target_columns(2023)
 
 # Infrastructure keywords for classification
 INFRASTRUCTURE_KEYWORDS = [
@@ -240,7 +246,8 @@ def compute_final(
     final_df["Α/Α"] = range(1, len(final_df) + 1)
 
     # Reorder columns to match target schema
-    final_df = final_df[TARGET_COLUMNS]
+    target_columns = get_target_columns(year)
+    final_df = final_df[target_columns]
 
     logger.info(f"Generated final dataset with {len(final_df)} services")
 
@@ -282,30 +289,35 @@ def _compute_service_metrics(
     year_start = datetime(year, 1, 1)
     year_end = datetime(year, 12, 31)
 
-    days_before_2023 = (year_start - window_start).days
-    days_after_2023 = (window_end - year_end).days
+    days_before_year = (year_start - window_start).days
+    days_after_year = (window_end - year_end).days
 
-    # Calculate 2023 consumption (prorated)
-    consumption_2023 = mean_per_day * 365 if not pd.isna(mean_per_day) else np.nan
-
-    # Calculate consumption before 2023
-    consumption_before_2023 = (
-        mean_per_day * days_before_2023 if not pd.isna(mean_per_day) else np.nan
+    # Calculate interpolated readings at year boundaries
+    reading_at_year_01_01, reading_at_year_12_31 = _interpolate_readings(
+        group,
+        year_start,
+        year_end,
+        window_start,
+        window_end,
+        initial_reading,
+        final_reading,
     )
 
-    # Calculate readings at year boundaries
-    reading_at_2023_01_01 = (
-        initial_reading - mean_per_day * days_before_2023
-        if not pd.isna(mean_per_day)
+    # Calculate year consumption as difference between interpolated readings
+    consumption_year = (
+        reading_at_year_12_31 - reading_at_year_01_01
+        if not pd.isna(reading_at_year_12_31) and not pd.isna(reading_at_year_01_01)
         else np.nan
     )
-    reading_at_2023_01_01_abs = (
-        abs(reading_at_2023_01_01) if not pd.isna(reading_at_2023_01_01) else np.nan
+
+    # Calculate consumption before year (prorated)
+    consumption_before_year = (
+        mean_per_day * days_before_year if not pd.isna(mean_per_day) else np.nan
     )
-    reading_at_2023_12_31 = (
-        reading_at_2023_01_01 + mean_per_day * 365
-        if not pd.isna(reading_at_2023_01_01)
-        else np.nan
+
+    # Calculate absolute reading at year start
+    reading_at_year_01_01_abs = (
+        abs(reading_at_year_01_01) if not pd.isna(reading_at_year_01_01) else np.nan
     )
 
     # Get service information
@@ -333,20 +345,84 @@ def _compute_service_metrics(
         "ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ": window_end,
         "ΚΑΤΑΓΡΑΦΗ ΣΤΗΝ ΤΕΛΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ": final_reading,
         "ΣΧΟΛΙΟ": "",
-        "ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/23": days_before_2023,
-        "ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/2023": days_after_2023,
+        f"ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/{year}": days_before_year,
+        f"ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/{year}": days_after_year,
         "ΚΑΤΑΓΡΑΦΟΜΕΝΗ ΠΕΡΙΟΔΟΣ": captured_days,
         "ΑΡ. ΗΜΕΡΩΝ 2019": 365,
         "ΚΑΤΑΝΑΛΩΣΗ ΚΑΤΑΓΡΑΦΟΜΕΝΗΣ ΠΕΡ. KWH": captured_kwh,
         "ΜΕΣΗ ΚΑΤΑΝΑΛΩΣΗ/ΗΜ.": mean_per_day,
-        "ΚΑΤΑΝΑΛΩΣΗ 2023 KWH": consumption_2023,
-        "ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.2023": consumption_before_2023,
-        "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023": reading_at_2023_01_01,
-        "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1": reading_at_2023_01_01_abs,
-        "ΚΑΤΑΝΑΛΩΣΗ 31.12.2023": reading_at_2023_12_31,
-        "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH": consumption_2023,  # Duplicate as per sample
+        f"ΚΑΤΑΝΑΛΩΣΗ {year} KWH": consumption_year,
+        f"ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.{year}": consumption_before_year,
+        f"ΚΑΤΑΝΑΛΩΣΗ 1.1.{year}": reading_at_year_01_01,
+        f"ΚΑΤΑΝΑΛΩΣΗ 1.1.{year}.1": reading_at_year_01_01_abs,
+        f"ΚΑΤΑΝΑΛΩΣΗ 31.12.{year}": reading_at_year_12_31,
+        "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH": consumption_year,  # Duplicate as per sample
         "Unnamed: 25": sector,
     }
+
+
+def _interpolate_readings(
+    group: pd.DataFrame,
+    year_start: datetime,
+    year_end: datetime,
+    window_start: datetime,
+    window_end: datetime,
+    initial_reading: float,
+    final_reading: float,
+) -> Tuple[float, float]:
+    """
+    Interpolate meter readings at year boundaries using linear interpolation.
+
+    Args:
+        group: Service data group
+        year_start: Start of target year (1/1/{year})
+        year_end: End of target year (31/12/{year})
+        window_start: Start of consumption window
+        window_end: End of consumption window
+        initial_reading: Reading at window start
+        final_reading: Reading at window end
+
+    Returns:
+        Tuple of (reading_at_year_start, reading_at_year_end)
+    """
+    # If target date is before or at window start, use initial reading
+    if year_start <= window_start:
+        reading_at_year_start = initial_reading
+    # If target date is after or at window end, use final reading
+    elif year_start >= window_end:
+        reading_at_year_start = final_reading
+    else:
+        # Linear interpolation within the window
+        total_days = (window_end - window_start).days
+        days_from_start = (year_start - window_start).days
+        if total_days > 0:
+            interpolation_factor = days_from_start / total_days
+            reading_at_year_start = (
+                initial_reading
+                + (final_reading - initial_reading) * interpolation_factor
+            )
+        else:
+            reading_at_year_start = initial_reading
+
+    # Same logic for year end
+    if year_end <= window_start:
+        reading_at_year_end = initial_reading
+    elif year_end >= window_end:
+        reading_at_year_end = final_reading
+    else:
+        # Linear interpolation within the window
+        total_days = (window_end - window_start).days
+        days_from_start = (year_end - window_start).days
+        if total_days > 0:
+            interpolation_factor = days_from_start / total_days
+            reading_at_year_end = (
+                initial_reading
+                + (final_reading - initial_reading) * interpolation_factor
+            )
+        else:
+            reading_at_year_end = initial_reading
+
+    return reading_at_year_start, reading_at_year_end
 
 
 def _find_consumption_window(
@@ -582,7 +658,9 @@ def format_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def write_final(df: pd.DataFrame, path: str, decimals_mode: str = "round"):
+def write_final(
+    df: pd.DataFrame, path: str, decimals_mode: str = "round", year: int = 2023
+):
     """
     Write final dataset to Excel file with proper formatting and number formatting.
 
@@ -658,12 +736,12 @@ def write_final(df: pd.DataFrame, path: str, decimals_mode: str = "round"):
                 worksheet.set_column(col_num, col_num, min(max_length + 2, 50))
 
         # Create metadata sheet
-        _create_metadata_sheet(workbook)
+        _create_metadata_sheet(workbook, year)
 
     logger.info(f"Successfully wrote {len(df)} records to {path}")
 
 
-def _create_metadata_sheet(workbook):
+def _create_metadata_sheet(workbook, year: int = 2023):
     """Create metadata sheet with column descriptions."""
 
     metadata = [
@@ -692,14 +770,14 @@ def _create_metadata_sheet(workbook):
         ],
         ["ΣΧΟΛΙΟ", "Comments", "Empty by default"],
         [
-            "ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/23",
-            "Days before 2023",
-            "(2023-01-01 - window_start).days",
+            f"ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/{year}",
+            f"Days before {year}",
+            f"({year}-01-01 - window_start).days",
         ],
         [
-            "ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/2023",
-            "Days after 2023",
-            "(window_end - 2023-12-31).days",
+            f"ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/{year}",
+            f"Days after {year}",
+            f"(window_end - {year}-12-31).days",
         ],
         [
             "ΚΑΤΑΓΡΑΦΟΜΕΝΗ ΠΕΡΙΟΔΟΣ",
@@ -717,26 +795,30 @@ def _create_metadata_sheet(workbook):
             "Average daily consumption",
             "captured_kwh / captured_days",
         ],
-        ["ΚΑΤΑΝΑΛΩΣΗ 2023 KWH", "2023 consumption (prorated)", "mean_per_day * 365"],
         [
-            "ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.2023",
-            "Consumption before 2023",
-            "mean_per_day * days_before_2023",
+            f"ΚΑΤΑΝΑΛΩΣΗ {year} KWH",
+            f"{year} consumption (interpolated)",
+            "reading_at_year_end - reading_at_year_start",
         ],
         [
-            "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023",
-            "Reading at 2023-01-01",
-            "initial_reading - mean_per_day * days_before_2023",
+            f"ΚΑΤΑΝΑΛΩΣΗ ΗΜΕΡΩΝ ΠΡΙΝ ΤΗΣ 1.1.{year}",
+            f"Consumption before {year}",
+            "mean_per_day * days_before_year",
         ],
         [
-            "ΚΑΤΑΝΑΛΩΣΗ 1.1.2023.1",
-            "Absolute reading at 2023-01-01",
-            "abs(reading_at_2023_01_01)",
+            f"ΚΑΤΑΝΑΛΩΣΗ 1.1.{year}",
+            f"Reading at {year}-01-01 (interpolated)",
+            "Linear interpolation from window readings",
         ],
         [
-            "ΚΑΤΑΝΑΛΩΣΗ 31.12.2023",
-            "Reading at 2023-12-31",
-            "reading_at_2023_01_01 + mean_per_day * 365",
+            f"ΚΑΤΑΝΑΛΩΣΗ 1.1.{year}.1",
+            f"Absolute reading at {year}-01-01",
+            "abs(reading_at_year_01_01)",
+        ],
+        [
+            f"ΚΑΤΑΝΑΛΩΣΗ 31.12.{year}",
+            f"Reading at {year}-12-31 (interpolated)",
+            "Linear interpolation from window readings",
         ],
         [
             "ΔΙΑΦΟΡΑ ΚΑΤΑΝΑΛΩΣΗΣ KWH",

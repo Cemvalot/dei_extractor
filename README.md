@@ -440,6 +440,126 @@ The final Excel file contains:
 2025-08-29 10:17:55,766 - INFO - All ΦΟΠ entries correctly classified as 'ΟΧΙ' ✓
 ```
 
+## 🗓️ Dynamic Year Processing
+
+**NEW: Multi-Year Support** - The transformation script now supports processing data for any year, not just 2023!
+
+### 🎯 What This Does
+
+The dynamic year functionality allows you to:
+- **Process any year** (2019, 2020, 2021, 2022, 2023, etc.)
+- **Automatic column naming** with year-specific headers
+- **Linear interpolation** for accurate meter readings at year boundaries
+- **Consistent output format** regardless of the target year
+
+### 🚀 Quick Start - Multi-Year Processing
+
+```bash
+# Process 2023 data (default)
+python scripts/transform_to_final.py \
+  --input "filtered.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx"
+
+# Process 2019 data
+python scripts/transform_to_final.py \
+  --input "filtered.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2019_FINAL.xlsx" \
+  --year 2019
+
+# Process 2022 data with validation
+python scripts/transform_to_final.py \
+  --input "filtered.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2022_FINAL.xlsx" \
+  --year 2022 \
+  --validate-against "sample_2022.xlsx"
+```
+
+### 📊 Dynamic Column Names
+
+The output columns automatically adapt to the target year:
+
+**For 2023:**
+- `ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/2023`
+- `ΚΑΤΑΝΑΛΩΣΗ 2023 KWH`
+- `ΚΑΤΑΝΑΛΩΣΗ 1.1.2023`
+- `ΚΑΤΑΝΑΛΩΣΗ 31.12.2023`
+
+**For 2019:**
+- `ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/2019`
+- `ΚΑΤΑΝΑΛΩΣΗ 2019 KWH`
+- `ΚΑΤΑΝΑΛΩΣΗ 1.1.2019`
+- `ΚΑΤΑΝΑΛΩΣΗ 31.12.2019`
+
+### 🔬 Linear Interpolation Algorithm
+
+The tool now uses **linear interpolation** for accurate meter readings at year boundaries:
+
+1. **If target date ≤ window start**: Use initial reading
+2. **If target date ≥ window end**: Use final reading
+3. **If within window**: Linear interpolation based on days
+
+**Formula:**
+```
+reading_at_date = initial_reading + (final_reading - initial_reading) × (days_from_start / total_days)
+```
+
+**Year Consumption Calculation:**
+```
+consumption_year = reading_at_year_end - reading_at_year_start
+```
+
+### 🎯 Key Benefits
+
+- **Accurate Readings**: Linear interpolation provides precise meter readings at year boundaries
+- **Consistent Format**: Same output structure regardless of target year
+- **Backward Compatible**: Default year is still 2023
+- **Memory Compliant**: Maintains the same output format as requested
+
+### 📋 All Year-Related Options
+
+```bash
+python scripts/transform_to_final.py --help
+```
+
+**Year-Specific Arguments:**
+- `--year`: Target year for calculations (default: 2023)
+- `--window-days`: ± window around year anchors in days (default: 60)
+- `--target-span-days`: Target total span in days (default: 365)
+
+### 🧪 Testing Multi-Year Processing
+
+```bash
+# Test with 2019 data
+python scripts/transform_to_final.py \
+  --input "dei_extractor/data/filtered.xlsx" \
+  --output "test_2019.xlsx" \
+  --year 2019 \
+  --log-level DEBUG
+
+# Verify column names
+python -c "
+import pandas as pd
+df = pd.read_excel('test_2019.xlsx')
+year_cols = [col for col in df.columns if '2019' in col]
+print('2019-specific columns:')
+for col in year_cols:
+    print(f'  {col}')
+"
+```
+
+### 📊 Output Verification
+
+```bash
+# Check year-specific calculations
+python -c "
+import pandas as pd
+df = pd.read_excel('ΠΑΡΟΧΕΣ_2019_FINAL.xlsx')
+print(f'Total services: {len(df)}')
+print(f'Year consumption column: {[col for col in df.columns if \"2019 KWH\" in col]}')
+print(f'Sample year consumption: {df[[col for col in df.columns if \"2019 KWH\" in col][0]].head()}')
+"
+```
+
 ## 🚀 Advanced Features
 
 ### Εκαθαριστικός Filtering

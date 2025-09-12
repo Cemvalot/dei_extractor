@@ -30,7 +30,7 @@ def setup_logging(level: str):
 
 
 def validate_against_sample(
-    final_df: pd.DataFrame, sample_path: str, tolerance: float = 1e-3
+    final_df: pd.DataFrame, sample_path: str, year: int = 2023, tolerance: float = 1e-3
 ):
     """
     Validate final dataset against sample file.
@@ -67,12 +67,12 @@ def validate_against_sample(
 
         # Sample validation for numeric fields (if sample has data)
         numeric_columns = [
-            "ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/23",
-            "ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/2023",
+            f"ΑΡ. ΗΜΕΡΩΝ ΠΡΙΝ ΑΠΟ 1/1/{year}",
+            f"ΑΡ. ΗΜΕΡΩΝ ΜΕΤΑ ΤΙΣ 31/12/{year}",
             "ΚΑΤΑΓΡΑΦΟΜΕΝΗ ΠΕΡΙΟΔΟΣ",
             "ΚΑΤΑΝΑΛΩΣΗ ΚΑΤΑΓΡΑΦΟΜΕΝΗΣ ΠΕΡ. KWH",
             "ΜΕΣΗ ΚΑΤΑΝΑΛΩΣΗ/ΗΜ.",
-            "ΚΑΤΑΝΑΛΩΣΗ 2023 KWH",
+            f"ΚΑΤΑΝΑΛΩΣΗ {year} KWH",
         ]
 
         # Check if sample has actual data (not all NaN)
@@ -174,7 +174,7 @@ def main():
         epilog="""
 Examples:
   python scripts/transform_to_final.py --input "filtered 2.xlsx" --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx"
-  python scripts/transform_to_final.py --input "data.xlsx" --output "output.xlsx" --year 2022 --validate-against "sample.xlsx"
+  python scripts/transform_to_final.py --input "data.xlsx" --output "ΠΑΡΟΧΕΣ_2019_FINAL.xlsx" --year 2019 --validate-against "sample.xlsx"
         """,
     )
 
@@ -189,7 +189,7 @@ Examples:
         "--output",
         "-o",
         required=True,
-        help="Path for output Excel file (ΠΑΡΟΧΕΣ_2023_FINAL.xlsx)",
+        help="Path for output Excel file (e.g., ΠΑΡΟΧΕΣ_2023_FINAL.xlsx)",
     )
 
     parser.add_argument(
@@ -271,7 +271,9 @@ Examples:
 
         # Write output
         logger.info("Writing final dataset...")
-        write_final(final_df, args.output, decimals_mode=args.decimals_mode)
+        write_final(
+            final_df, args.output, decimals_mode=args.decimals_mode, year=args.year
+        )
 
         # Validate ΦΟΠ classification
         validate_fop_classification(final_df)
@@ -279,7 +281,7 @@ Examples:
         # Validate against sample if provided
         if args.validate_against:
             if Path(args.validate_against).exists():
-                validate_against_sample(final_df, args.validate_against)
+                validate_against_sample(final_df, args.validate_against, args.year)
             else:
                 logger.warning(f"Sample file not found: {args.validate_against}")
 
