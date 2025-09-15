@@ -17,10 +17,66 @@ This tool extracts structured data from Greek DEI electricity bill PDFs and conv
 - 🚫 **Duplicate Removal**: Removes duplicate records automatically
 - 📊 **Multiple Output Formats**: Creates CSV and Excel files
 - 🛡️ **Error Handling**: Comprehensive logging and validation
+- 🌐 **Modern Web Interface**: Drag & drop file upload with real-time progress
+- 🔄 **Transform Feature**: Convert Phase-1 data to Final consolidated datasets
+- 🔒 **Production Ready**: Docker deployment with HTTPS and authentication
 
-## 🚀 Quick Start Guide (For Beginners)
+## 🚀 Quick Start Guide
 
-### Step 1: Install Prerequisites
+### Option 1: Docker Compose (Recommended - Production Ready)
+
+**The easiest way to run the application with a modern web interface:**
+
+```bash
+# 1. Navigate to the project directory
+cd /path/to/dei_extractor
+
+# 2. Start the application (one command!)
+cd ops
+docker compose up -d
+
+# 3. Access the web interface
+# Open your browser to: http://localhost:8080
+# Username: admin
+# Password: testpass
+```
+
+**✅ That's it!** The application is now running with:
+- **Modern Web UI**: Upload files via drag & drop
+- **Real-time Progress**: See processing status live
+- **Transform Feature**: Convert Phase-1 data to Final format
+- **Automatic OCR**: Handles both text and scanned PDFs
+- **Secure**: HTTPS with basic authentication
+
+**To stop the application:**
+```bash
+cd ops
+docker compose down
+```
+
+**To view live logs:**
+```bash
+cd ops
+docker compose logs -f
+```
+
+**To view logs for specific services:**
+```bash
+# Backend logs (FastAPI)
+docker compose logs -f backend
+
+# Frontend logs (Next.js)
+docker compose logs -f frontend
+
+# Proxy logs (Caddy)
+docker compose logs -f proxy
+```
+
+### Option 2: Command Line (For Developers)
+
+**For command-line usage and development:**
+
+#### Step 1: Install Prerequisites
 
 **First, install Tesseract OCR** (needed for scanned PDFs):
 
@@ -38,7 +94,7 @@ sudo apt install tesseract-ocr tesseract-ocr-ell
 **On Windows:**
 Download from: https://github.com/UB-Mannheim/tesseract/wiki
 
-### Step 2: Set Up the Tool
+#### Step 2: Set Up the Tool
 
 ```bash
 # 1. Open Terminal/Command Prompt
@@ -72,6 +128,53 @@ dei-extract --input "my_pdfs" --output-dir "results" --verbose --filter
 - Automatically detects if they're old or new format
 - Creates results in the "results" folder
 - Shows detailed progress (--verbose)
+
+## 🆕 Transform Feature (Web Interface)
+
+**NEW: Phase-1 to Final Dataset Transformation** - Convert your filtered Phase-1 output into the final consolidated dataset format.
+
+### 🎯 What This Does
+
+The Transform feature takes your Phase-1 Excel output (from the main extraction) and creates a final consolidated dataset with:
+- **One row per service** (ΠΑΡΟΧΗ)
+- **Year-specific consumption** calculations
+- **Infrastructure classification** with ΦΟΠ override rules
+- **Professional Excel formatting** with metadata
+
+### 🚀 How to Use the Transform Feature
+
+**Via Web Interface (Recommended):**
+
+1. **Start the application:**
+   ```bash
+   cd ops
+   docker compose up -d
+   ```
+
+2. **Access the web interface:**
+   - Open: http://localhost:8080
+   - Login: admin / testpass
+
+3. **Use the Transform feature:**
+   - Click "Transform" in the navigation
+   - Upload your Phase-1 Excel file (e.g., `filtered.xlsx`)
+   - Optionally upload a classification CSV file
+   - Set the target year (default: 2023)
+   - Choose whether to keep string IDs
+   - Click "Run Transform"
+   - Download the final Excel file
+
+**Via Command Line:**
+```bash
+# Activate environment
+source dei_env_new/bin/activate
+
+# Run transformation
+python scripts/transform_to_final.py \
+  --input "dei_extractor/data/filtered.xlsx" \
+  --output "ΠΑΡΟΧΕΣ_2023_FINAL.xlsx" \
+  --year 2023
+```
 
 ### Step 4: Check Your Results
 
@@ -137,6 +240,51 @@ dei-extract --input "dei_extractor/data" --output-dir "test_results" --verbose
 | `ΚατηγορίαΤιμολογίου` | Bill type | ΦΟΠ or Επαγγελματικό |
 | `Υποκατηγορία` | Subcategory | Απλό επαγγελματικό |
 | `Εκαθαριστικός` | Final settlement | True/False |
+
+## 🌐 Web Application Features
+
+### Modern Web Interface
+
+The Docker Compose deployment provides a complete web application with:
+
+**🎨 Frontend (Next.js)**
+- **Drag & Drop Upload**: Easy file upload interface
+- **Real-time Progress**: Live progress updates during processing
+- **Multi-language Support**: English and Greek interfaces
+- **Responsive Design**: Works on desktop and mobile
+- **Transform Feature**: Dedicated page for Phase-1 to Final conversion
+
+**⚡ Backend (FastAPI)**
+- **RESTful API**: Clean API endpoints for all operations
+- **File Validation**: Server-side upload validation and security
+- **OCR Processing**: Automatic text extraction from scanned PDFs
+- **Safe ZIP Extraction**: Prevents zip-slip security vulnerabilities
+- **Automatic Cleanup**: Background cleanup of temporary files
+
+**🔒 Proxy (Caddy)**
+- **HTTPS Security**: Automatic HTTPS with internal certificates
+- **Basic Authentication**: Username/password protection
+- **Security Headers**: Comprehensive security headers
+- **Upload Limits**: Configurable file size and count limits
+- **Reverse Proxy**: Routes API calls to backend, UI to frontend
+
+### Application URLs
+
+When running with Docker Compose:
+- **Main Application**: http://localhost:8080
+- **Extract Feature**: http://localhost:8080/ (main page)
+- **Transform Feature**: http://localhost:8080/transform
+- **API Documentation**: http://localhost:8080/api/docs (when backend is running)
+
+### Security Features
+
+- ✅ **HTTPS Encryption**: All traffic encrypted in transit
+- ✅ **Basic Authentication**: Username/password protection
+- ✅ **File Type Validation**: Only PDF and ZIP files allowed
+- ✅ **Upload Size Limits**: Configurable limits prevent abuse
+- ✅ **Safe File Processing**: Prevents directory traversal attacks
+- ✅ **Automatic Cleanup**: No files persist after processing
+- ✅ **Security Headers**: Comprehensive security headers via Caddy
 
 ## 🔄 How the Unified Architecture Works
 
@@ -217,7 +365,70 @@ print(f"Modern files: {stats['modern']}")
 
 ## 🆘 Troubleshooting Guide
 
-### Common Problems and Solutions
+### Docker Compose Issues
+
+**❌ Problem: "Docker not found" or "docker compose not found"**
+
+**Solution:**
+```bash
+# Install Docker Desktop or Docker Engine
+# On macOS: Download from https://www.docker.com/products/docker-desktop
+# On Ubuntu: sudo apt install docker.io docker-compose-plugin
+# On Windows: Download Docker Desktop
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+**❌ Problem: "Port 8080 already in use"**
+
+**Solution:**
+```bash
+# Check what's using port 8080
+lsof -i :8080
+
+# Kill the process or change the port in ops/docker-compose.yml
+# Change "8080:443" to "8081:443" and access via http://localhost:8081
+```
+
+**❌ Problem: "Cannot connect to the Docker daemon"**
+
+**Solution:**
+```bash
+# Start Docker service
+sudo systemctl start docker  # Linux
+# Or start Docker Desktop application
+
+# Add your user to docker group (Linux)
+sudo usermod -aG docker $USER
+# Then logout and login again
+```
+
+**❌ Problem: "Build failed" or "Image not found"**
+
+**Solution:**
+```bash
+# Clean Docker cache and rebuild
+cd ops
+docker system prune -a
+docker compose build --no-cache
+docker compose up -d
+```
+
+**❌ Problem: "Authentication failed" or "Cannot login"**
+
+**Solution:**
+```bash
+# Default credentials:
+# Username: admin
+# Password: testpass
+
+# If you changed the password, check ops/Caddyfile for the hash
+# Generate new hash: docker run --rm caddy:2 caddy hash-password --plaintext 'yourpassword'
+```
+
+### Command Line Issues
 
 **❌ Problem: "Command not found: dei-extract"**
 
@@ -624,6 +835,83 @@ dei_extractor/
 ├── UNIFIED_ARCHITECTURE.md       # 🆕 Architecture documentation
 └── [other files]
 ```
+
+## 🏗️ Production Deployment
+
+### Architecture Overview
+
+The Docker Compose deployment consists of three services:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Backend       │    │   Proxy         │
+│   (Next.js)     │    │   (FastAPI)     │    │   (Caddy)       │
+│   Port: 3000    │    │   Port: 8000    │    │   Port: 443     │
+│                 │    │                 │    │                 │
+│ • React UI      │    │ • PDF Processing│    │ • HTTPS         │
+│ • File Upload   │    │ • OCR Engine    │    │ • Auth          │
+│ • Progress UI   │    │ • API Endpoints │    │ • Security      │
+│ • Transform UI  │    │ • File Validation│   │ • Routing       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │   User Browser  │
+                    │   Port: 8080    │
+                    │                 │
+                    │ • HTTPS Access  │
+                    │ • Basic Auth    │
+                    │ • File Upload   │
+                    │ • Download      │
+                    └─────────────────┘
+```
+
+### Production Considerations
+
+**🔒 Security:**
+- Change default password in `ops/Caddyfile`
+- Use external certificates for production
+- Configure firewall rules
+- Monitor access logs
+
+**⚡ Performance:**
+- Adjust upload limits in `ops/docker-compose.yml`
+- Monitor memory usage during large file processing
+- Consider scaling backend services for high load
+- Use SSD storage for better I/O performance
+
+**📊 Monitoring:**
+- Use `docker compose logs -f` for real-time monitoring
+- Set up log aggregation for production
+- Monitor disk space (temporary files are auto-cleaned)
+- Track processing times and success rates
+
+**🔄 Maintenance:**
+- Regular Docker image updates
+- Monitor for security vulnerabilities
+- Backup custom configurations
+- Test with sample data regularly
+
+### Environment Configuration
+
+Key environment variables in `ops/docker-compose.yml`:
+
+```yaml
+environment:
+  - RETENTION_HOURS=24        # Hours to keep temp files
+  - MAX_FILES=50             # Max files per upload
+  - MAX_UPLOAD_MB=100        # Max upload size in MB
+  - LOG_LEVEL=INFO           # Logging level
+```
+
+### Scaling Considerations
+
+For high-volume processing:
+1. **Horizontal Scaling**: Run multiple backend containers
+2. **Load Balancing**: Use external load balancer
+3. **Storage**: Use shared storage for temporary files
+4. **Queue System**: Implement job queue for large batches
 
 ## 📄 License
 
