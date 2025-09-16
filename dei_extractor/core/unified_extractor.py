@@ -31,8 +31,11 @@ from ..utils.config import Config
 from ..utils.id_helpers import compute_arparchi_group_id
 from ..utils.logger import LoggerMixin
 from ..utils.validators import parse_ddmmyyyy
+from .exporters.xlsx_exporter import to_format_3_xlsx
 from .extractor_modern import DEIModernExtractor
 from .extractor_v2018 import DEIV2018Extractor, detect_v2018_layout
+from .parsers.format_3 import detect as detect_format_3
+from .parsers.format_3 import parse as parse_format_3
 
 # Configure logging
 logging.basicConfig(
@@ -57,7 +60,7 @@ class DEIUnifiedExtractor(LoggerMixin):
         self.config = config or Config()
         self.v2018_extractor = DEIV2018Extractor(config)
         self.modern_extractor = DEIModernExtractor(config)
-        self.format_stats = {"v2018": 0, "modern": 0, "unknown": 0}
+        self.format_stats = {"v2018": 0, "modern": 0, "format_3": 0, "unknown": 0}
 
     def detect_pdf_format(self, pdf_path: str) -> str:
         """Detect the format of a PDF file."""
@@ -72,8 +75,12 @@ class DEIUnifiedExtractor(LoggerMixin):
                 # Join text for format detection
                 full_text = "\n".join(text_lines)
 
+                # Check for format_3 first
+                if detect_format_3(full_text):
+                    logger.info(f"Detected format_3 for {pdf_path}")
+                    return "format_3"
                 # Check for v2018 format
-                if detect_v2018_layout(full_text):
+                elif detect_v2018_layout(full_text):
                     logger.info(f"Detected v2018 format for {pdf_path}")
                     return "v2018"
                 else:
@@ -86,7 +93,7 @@ class DEIUnifiedExtractor(LoggerMixin):
 
     def categorize_pdfs(self, pdf_paths: List[str]) -> Dict[str, List[str]]:
         """Categorize PDF files by their format."""
-        categorized = {"v2018": [], "modern": [], "unknown": []}
+        categorized = {"v2018": [], "modern": [], "format_3": [], "unknown": []}
 
         for pdf_path in pdf_paths:
             format_type = self.detect_pdf_format(pdf_path)
@@ -96,6 +103,7 @@ class DEIUnifiedExtractor(LoggerMixin):
         logger.info(f"PDF categorization complete:")
         logger.info(f"  v2018: {len(categorized['v2018'])} files")
         logger.info(f"  modern: {len(categorized['modern'])} files")
+        logger.info(f"  format_3: {len(categorized['format_3'])} files")
         logger.info(f"  unknown: {len(categorized['unknown'])} files")
 
         return categorized
@@ -127,6 +135,23 @@ class DEIUnifiedExtractor(LoggerMixin):
                 all_records.extend(modern_df.to_dict("records"))
                 logger.info(f"Extracted {len(modern_df)} modern records")
 
+        # Process format_3 PDFs
+        format_3_payloads = []
+        format_3_files = []
+        if categorized_pdfs["format_3"]:
+            logger.info(
+                f"Processing {len(categorized_pdfs['format_3'])} format_3 PDFs..."
+            )
+            format_3_records = self.process_format_3_files(categorized_pdfs["format_3"])
+            if format_3_records:
+                all_records.extend(format_3_records)
+                logger.info(f"Extracted {len(format_3_records)} format_3 records")
+
+            # Also get raw payloads for format_3 specific export
+            format_3_payloads, format_3_files = self.process_format_3_files_raw(
+                categorized_pdfs["format_3"]
+            )
+
         # Handle unknown format PDFs
         if categorized_pdfs["unknown"]:
             logger.warning(
@@ -149,6 +174,7 @@ class DEIUnifiedExtractor(LoggerMixin):
         logger.info(f"Total files processed: {len(file_paths)}")
         logger.info(f"v2018 files: {self.format_stats['v2018']}")
         logger.info(f"Modern files: {self.format_stats['modern']}")
+        logger.info(f"Format_3 files: {self.format_stats['format_3']}")
         logger.info(f"Unknown format: {self.format_stats['unknown']}")
         logger.info(f"Total records extracted: {len(df)}")
 
@@ -158,7 +184,41 @@ class DEIUnifiedExtractor(LoggerMixin):
             for layout, count in layout_counts.items():
                 logger.info(f"  {layout}: {count}")
 
+        # Store format_3 data for later export
+        self.format_3_payloads = format_3_payloads
+        self.format_3_files = format_3_files
+
         return df
+
+    def write_format_3_outputs(
+        self,
+        format_3_payloads: List[Dict],
+        format_3_files: List[str],
+        output_dir: str = ".",
+    ):
+        """
+        Write format_3 specific output files with simplified columns.
+
+        Args:
+            format_3_payloads: List of format_3 parsed payloads
+            format_3_files: List of corresponding source file paths
+            output_dir: Output directory path
+        """
+        if not format_3_payloads:
+            logger.warning("No format_3 data to write")
+            return
+
+        # Create output directory if it doesn't exist
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Export format_3 data to simplified XLSX
+        format_3_xlsx_path = output_path / "format_3_simplified.xlsx"
+        try:
+            to_format_3_xlsx(format_3_payloads, format_3_files, str(format_3_xlsx_path))
+            logger.info(f"Format_3 simplified XLSX written to: {format_3_xlsx_path}")
+        except Exception as e:
+            logger.error(f"Failed to write format_3 XLSX: {e}")
 
     def write_outputs(self, df: pd.DataFrame, output_dir: str = "."):
         """Write output files in CSV and Excel formats."""
@@ -169,6 +229,37 @@ class DEIUnifiedExtractor(LoggerMixin):
         # Create output directory if it doesn't exist
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
+
+        # Check if we have only format_3 data
+        has_format_3_only = (
+            hasattr(self, "format_3_payloads")
+            and hasattr(self, "format_3_files")
+            and self.format_3_payloads
+            and self.format_3_files
+            and self.format_stats.get("format_3", 0) > 0
+            and self.format_stats.get("v2018", 0) == 0
+            and self.format_stats.get("modern", 0) == 0
+        )
+
+        if has_format_3_only:
+            logger.info("Only format_3 data detected - creating simplified output only")
+            # Write only format_3 simplified output
+            self.write_format_3_outputs(
+                self.format_3_payloads, self.format_3_files, output_dir
+            )
+
+            # Write format statistics
+            with open(output_path / "format_stats.txt", "w", encoding="utf-8") as f:
+                f.write(f"DEI PDF Format Processing Statistics\n")
+                f.write(f"Generated: {datetime.now()}\n\n")
+                f.write(f"Total files processed: {sum(self.format_stats.values())}\n")
+                f.write(f"format_3 files: {self.format_stats['format_3']}\n")
+                f.write(f"Total records extracted: {len(self.format_3_payloads)}\n")
+                f.write(f"Records by layout:\n")
+                f.write(f"  format_3: {len(self.format_3_payloads)}\n")
+
+            logger.info("Format_3 simplified output written successfully")
+            return
 
         # Ensure all text columns are strings
         text_columns = [
@@ -265,6 +356,13 @@ class DEIUnifiedExtractor(LoggerMixin):
 
         logger.info("Unified output files written successfully")
 
+        # Write format_3 specific simplified output if available
+        if hasattr(self, "format_3_payloads") and hasattr(self, "format_3_files"):
+            if self.format_3_payloads and self.format_3_files:
+                self.write_format_3_outputs(
+                    self.format_3_payloads, self.format_3_files, output_dir
+                )
+
         # Write format statistics
         with open(output_path / "format_stats.txt", "w", encoding="utf-8") as f:
             f.write(f"DEI PDF Format Processing Statistics\n")
@@ -295,13 +393,119 @@ class DEIUnifiedExtractor(LoggerMixin):
                 for warning in all_warnings:
                     f.write(f"WARNING: {warning}\n")
 
+    def process_format_3_files(self, pdf_paths: List[str]) -> List[Dict]:
+        """Process format_3 PDF files and return structured records."""
+        records = []
+
+        for pdf_path in pdf_paths:
+            try:
+                # Read PDF bytes
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+
+                # Parse using format_3 parser
+                payload = parse_format_3(pdf_bytes, pdf_path)
+
+                # Convert to standardized record format
+                record = self.convert_format_3_to_standard(payload, pdf_path)
+                if record:
+                    records.append(record)
+
+            except Exception as e:
+                logger.error(f"Error processing format_3 PDF {pdf_path}: {e}")
+                continue
+
+        return records
+
+    def process_format_3_files_raw(
+        self, pdf_paths: List[str]
+    ) -> Tuple[List[Dict], List[str]]:
+        """Process format_3 PDF files and return raw payloads and file paths."""
+        payloads = []
+        processed_files = []
+
+        for pdf_path in pdf_paths:
+            try:
+                # Read PDF bytes
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+
+                # Parse using format_3 parser
+                payload = parse_format_3(pdf_bytes, pdf_path)
+
+                if payload and payload.get("supply_number", {}).get("normalized"):
+                    payloads.append(payload)
+                    processed_files.append(pdf_path)
+
+            except Exception as e:
+                logger.error(f"Error processing format_3 PDF {pdf_path}: {e}")
+                continue
+
+        return payloads, processed_files
+
+    def convert_format_3_to_standard(
+        self, payload: Dict, source_file: str
+    ) -> Optional[Dict]:
+        """Convert format_3 payload to standard record format."""
+        if not payload or not payload.get("supply_number", {}).get("normalized"):
+            return None
+
+        # Map format_3 fields to standard format
+        record = {
+            "ΑρΠαροχής": payload.get("supply_number", {}).get("normalized"),
+            "ΑρΛογαριασμού": payload.get("account_number"),
+            "ΗμΈκδοσης": payload.get("issue_date"),
+            "ΠερίοδοςΚατανάλωσης": f"{payload.get('period_from', '')}-{payload.get('period_to', '')}",
+            "Ονοματεπώνυμο_Διεύθυνση": self._get_name_address(payload),
+            "Πόλη": self._get_city(payload),
+            "Τελευταία": payload.get("reading_last"),
+            "Προηγούμενη": payload.get("reading_prev"),
+            "ΣΩΧΒ": payload.get("kwh_night"),
+            "ΣυνΩΧΒ": payload.get("kwh_total"),
+            "ΚατηγορίαΤιμολογίου": payload.get("tariff_category"),
+            "Υποκατηγορία": payload.get("tariff_subcategory"),
+            "Εκαθαριστικός": payload.get("is_clearing", False),
+            "source_file": source_file,
+            "ΠερίοδοςΚατανάλωσης_Αρχική": payload.get("period_from"),
+            "ΠερίοδοςΚατανάλωσης_Τελική": payload.get("period_to"),
+            "raw_code": payload.get("account_number")
+            or payload.get("supply_number", {}).get("pretty"),
+            "raw_label": payload.get("format"),
+            "layout": "format_3",
+            "needs_review": False,
+            "reason": None,
+            "confidence": 1.0,
+        }
+
+        return record
+
+    def _get_name_address(self, payload: Dict) -> str:
+        """Get combined name and address from format_3 payload."""
+        name = payload.get("recipient_name", "")
+        address = payload.get("recipient_address_line1", "")
+        parts = [part for part in [name, address] if part]
+        return ", ".join(parts)
+
+    def _get_city(self, payload: Dict) -> str:
+        """Get city from format_3 payload."""
+        city = payload.get("city")
+        if city:
+            return city
+
+        postcode_city = payload.get("recipient_postcode_city", "")
+        if postcode_city:
+            parts = postcode_city.split(" ", 1)
+            if len(parts) > 1:
+                return parts[1]
+        return ""
+
     def get_format_statistics(self) -> Dict[str, int]:
         """Get statistics about processed formats."""
         return self.format_stats.copy()
 
     def reset_statistics(self):
         """Reset format statistics."""
-        self.format_stats = {"v2018": 0, "modern": 0, "unknown": 0}
+        self.format_stats = {"v2018": 0, "modern": 0, "format_3": 0, "unknown": 0}
 
     def add_merge_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add merge_key and ΑρΠαρχ_Αρίθμηση fields to the DataFrame."""
