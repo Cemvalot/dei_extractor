@@ -88,8 +88,10 @@ class ExtractorService:
             # Categorize PDFs by format
             categorized_pdfs = extractor.categorize_pdfs([str(f) for f in pdf_files])
 
-            total_to_process = len(categorized_pdfs["v2018"]) + len(
-                categorized_pdfs["modern"]
+            total_to_process = (
+                len(categorized_pdfs["v2018"])
+                + len(categorized_pdfs["modern"])
+                + len(categorized_pdfs.get("format_3", []))
             )
             processed_files = 0
 
@@ -145,6 +147,37 @@ class ExtractorService:
                         if not df.empty:
                             all_records.extend(df.to_dict("records"))
                             log_output += f"Extracted {len(df)} records from {Path(pdf_path).name}\n"
+                    except Exception as e:
+                        error_msg = f"Error processing {Path(pdf_path).name}: {e}"
+                        warnings.append(error_msg)
+                        log_output += error_msg + "\n"
+
+                    processed_files += 1
+
+            # Progress: 75-80% - Process format_3 PDFs
+            if categorized_pdfs.get("format_3"):
+                if progress_callback:
+                    progress_callback(
+                        75,
+                        f"Processing {len(categorized_pdfs['format_3'])} format_3 PDFs...",
+                    )
+
+                for i, pdf_path in enumerate(categorized_pdfs["format_3"]):
+                    if progress_callback:
+                        progress = 75 + int(
+                            5 * (i + 1) / len(categorized_pdfs["format_3"])
+                        )
+                        filename = Path(pdf_path).name
+                        progress_callback(
+                            progress, f"Processing format_3 PDF: {filename}"
+                        )
+
+                    try:
+                        # Process individual file using unified extractor
+                        records = extractor.process_format_3_files([pdf_path])
+                        if records:
+                            all_records.extend(records)
+                            log_output += f"Extracted {len(records)} records from {Path(pdf_path).name}\n"
                     except Exception as e:
                         error_msg = f"Error processing {Path(pdf_path).name}: {e}"
                         warnings.append(error_msg)

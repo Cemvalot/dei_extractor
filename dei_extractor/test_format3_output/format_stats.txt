@@ -1,0 +1,8 @@
+DEI PDF Format Processing Statistics
+Generated: 2025-09-16 11:16:27.755848
+
+Total files processed: 24
+format_3 files: 24
+Total records extracted: 24
+Records by layout:
+  format_3: 24
