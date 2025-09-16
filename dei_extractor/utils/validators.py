@@ -173,20 +173,35 @@ def validate_directory_path(
 
 
 # Date parsing helper functions
-PERIOD_SPLIT = re.compile(r"(\d{2}\.\d{2}\.\d{4})-(\d{2}\.\d{2}\.\d{4})")
+PERIOD_SPLIT_DOTS = re.compile(r"(\d{2}\.\d{2}\.\d{4})-(\d{2}\.\d{2}\.\d{4})")
+PERIOD_SPLIT_SLASHES = re.compile(r"(\d{2}/\d{2}/\d{4})\s*-\s*(\d{2}/\d{2}/\d{4})")
 
 
 def split_period(period: str):
     """
     Επιστρέφει (start_str, end_str) σε μορφή dd.mm.yyyy.
+    Υποστηρίζει και τις μορφές dd.mm.yyyy-dd.mm.yyyy και dd/mm/yyyy - dd/mm/yyyy.
     Αν δεν ταιριάζει, επιστρέφει (None, None).
     """
     if not isinstance(period, str):
         return None, None
-    m = PERIOD_SPLIT.fullmatch(period.strip())
-    if not m:
-        return None, None
-    return m.group(1), m.group(2)
+
+    period = period.strip()
+
+    # Try dots format first (dd.mm.yyyy-dd.mm.yyyy)
+    m = PERIOD_SPLIT_DOTS.fullmatch(period)
+    if m:
+        return m.group(1), m.group(2)
+
+    # Try slashes format (dd/mm/yyyy - dd/mm/yyyy)
+    m = PERIOD_SPLIT_SLASHES.fullmatch(period)
+    if m:
+        # Convert slashes to dots for consistency
+        start_date = m.group(1).replace("/", ".")
+        end_date = m.group(2).replace("/", ".")
+        return start_date, end_date
+
+    return None, None
 
 
 def parse_ddmmyyyy(s: str):
