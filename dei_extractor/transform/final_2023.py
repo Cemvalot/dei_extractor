@@ -23,7 +23,7 @@ def get_target_columns(year: int) -> List[str]:
         "Α/Α",
         "ΠΑΡΟΧΗ",
         "ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ",
-        "ΟΝΟΜΑ ",
+        "ΟΝΟΜΑ ",  # Now contains combined name and city
         "ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ)",
         "ΕΙΔΟΣ ΥΠΟΔΟΜΗΣ",
         "ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ",
@@ -324,9 +324,13 @@ def _compute_service_metrics(
     service_id = group["ΑρΠαροχής"].iloc[0]
     account_id = group["ΑρΛογαριασμού"].iloc[0]
     site_name = group["Ονοματεπώνυμο_Διεύθυνση"].iloc[0]
+    city = group["Πόλη"].iloc[0] if "Πόλη" in group.columns else ""
 
     # Clean site name
     clean_name = _clean_site_name(site_name)
+
+    # Create filtered column combining name/address and city
+    filtered_name = _create_filtered_name(clean_name, city)
 
     # Classify infrastructure
     infrastructure_flag, facility_type, subtype, sector = _classify_infrastructure(
@@ -337,7 +341,7 @@ def _compute_service_metrics(
         "Α/Α": np.nan,  # Will be set later
         "ΠΑΡΟΧΗ": service_id,
         "ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ": account_id,
-        "ΟΝΟΜΑ ": clean_name,
+        "ΟΝΟΜΑ ": filtered_name,  # Combined name and city (replaces old ΟΝΟΜΑ)
         "ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ)": infrastructure_flag,
         "ΕΙΔΟΣ ΥΠΟΔΟΜΗΣ": facility_type,
         "ΑΡΧΙΚΗ ΗΜΕΡΟΜΗΝΙΑ ": window_start,
@@ -575,6 +579,32 @@ def _clean_site_name(name: str) -> str:
     return " ".join(cleaned_words)
 
 
+def _create_filtered_name(name: str, city: str) -> str:
+    """Create filtered column combining name/address and city."""
+    if pd.isna(name):
+        name = ""
+    if pd.isna(city):
+        city = ""
+
+    # Convert to string and uppercase
+    name = str(name).upper().strip()
+    city = str(city).upper().strip()
+
+    # If city is already in the name, just return the name
+    if city and city in name:
+        return name
+
+    # Combine name and city
+    if name and city:
+        return f"{name} - {city}"
+    elif name:
+        return name
+    elif city:
+        return city
+    else:
+        return ""
+
+
 def _classify_infrastructure(
     name: str, group: pd.DataFrame, class_mapping: Dict
 ) -> Tuple[str, str, str, str]:
@@ -749,7 +779,11 @@ def _create_metadata_sheet(workbook, year: int = 2023):
         ["Α/Α", "Sequential index", "Auto-generated 1..N"],
         ["ΠΑΡΟΧΗ", "Service/Meter ID", "From ΑρΠαροχής"],
         ["ΑΡΙΘΜΟΣ ΣΥΜΒΟΛΑΙΟΥ ", "Account/Contract number", "From ΑρΛογαριασμού"],
-        ["ΟΝΟΜΑ ", "Site name and address", "Cleaned from Ονοματεπώνυμο_Διεύθυνση"],
+        [
+            "ΟΝΟΜΑ ",
+            "Site name and address with city",
+            "Combined Ονοματεπώνυμο_Διεύθυνση + Πόλη",
+        ],
         [
             "ΚΤΗΡΙΟ - ΥΠΟΔΟΜΕΣ (ΝΑΙ / ΟΧΙ)",
             "Infrastructure flag",
