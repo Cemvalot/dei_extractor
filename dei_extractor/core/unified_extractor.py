@@ -33,6 +33,7 @@ from ..utils.logger import LoggerMixin
 from ..utils.validators import parse_ddmmyyyy
 from .exporters.xlsx_exporter import to_format_3_xlsx
 from .extractor_modern import DEIModernExtractor
+from .extractor_tabular import DEITabularExtractor, detect_tabular_format
 from .extractor_v2018 import DEIV2018Extractor, detect_v2018_layout
 from .parsers.format_3 import detect as detect_format_3
 from .parsers.format_3 import parse as parse_format_3
@@ -60,17 +61,45 @@ class DEIUnifiedExtractor(LoggerMixin):
         self.config = config or Config()
         self.v2018_extractor = DEIV2018Extractor(config)
         self.modern_extractor = DEIModernExtractor(config)
-        self.format_stats = {"v2018": 0, "modern": 0, "format_3": 0, "unknown": 0}
+        self.tabular_extractor = DEITabularExtractor(config)
+        self.format_stats = {
+            "v2018": 0,
+            "modern": 0,
+            "format_3": 0,
+            "tabular": 0,
+            "unknown": 0,
+        }
 
     def detect_pdf_format(self, pdf_path: str) -> str:
         """Detect the format of a PDF file."""
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 text_lines = []
-                for page in pdf.pages:
+                ocr_needed = False
+
+                for page in pdf.pages[:2]:  # Check first 2 pages for detection
                     text = page.extract_text()
-                    if text:
+                    if text and len(text.strip()) > 50:
                         text_lines.extend(text.split("\n"))
+                    else:
+                        ocr_needed = True
+                        break
+
+                # If no text extracted, try OCR for detection
+                if ocr_needed or not text_lines:
+                    logger.info(f"Using OCR for format detection: {pdf_path}")
+                    try:
+                        import pytesseract
+                        from pdf2image import convert_from_path
+
+                        images = convert_from_path(pdf_path, first_page=1, last_page=1)
+                        if images:
+                            ocr_text = pytesseract.image_to_string(
+                                images[0], lang="ell+eng", config="--psm 6"
+                            )
+                            text_lines = ocr_text.split("\n")
+                    except Exception as e:
+                        logger.warning(f"OCR detection failed: {e}")
 
                 # Join text for format detection
                 full_text = "\n".join(text_lines)
@@ -79,6 +108,10 @@ class DEIUnifiedExtractor(LoggerMixin):
                 if detect_format_3(full_text):
                     logger.info(f"Detected format_3 for {pdf_path}")
                     return "format_3"
+                # Check for tabular format (bulk invoices)
+                elif detect_tabular_format(full_text):
+                    logger.info(f"Detected tabular format for {pdf_path}")
+                    return "tabular"
                 # Check for v2018 format
                 elif detect_v2018_layout(full_text):
                     logger.info(f"Detected v2018 format for {pdf_path}")
@@ -93,7 +126,13 @@ class DEIUnifiedExtractor(LoggerMixin):
 
     def categorize_pdfs(self, pdf_paths: List[str]) -> Dict[str, List[str]]:
         """Categorize PDF files by their format."""
-        categorized = {"v2018": [], "modern": [], "format_3": [], "unknown": []}
+        categorized = {
+            "v2018": [],
+            "modern": [],
+            "format_3": [],
+            "tabular": [],
+            "unknown": [],
+        }
 
         for pdf_path in pdf_paths:
             format_type = self.detect_pdf_format(pdf_path)
@@ -104,6 +143,7 @@ class DEIUnifiedExtractor(LoggerMixin):
         logger.info(f"  v2018: {len(categorized['v2018'])} files")
         logger.info(f"  modern: {len(categorized['modern'])} files")
         logger.info(f"  format_3: {len(categorized['format_3'])} files")
+        logger.info(f"  tabular: {len(categorized['tabular'])} files")
         logger.info(f"  unknown: {len(categorized['unknown'])} files")
 
         return categorized
@@ -152,6 +192,18 @@ class DEIUnifiedExtractor(LoggerMixin):
                 categorized_pdfs["format_3"]
             )
 
+        # Process tabular PDFs (bulk invoice listings)
+        if categorized_pdfs["tabular"]:
+            logger.info(
+                f"Processing {len(categorized_pdfs['tabular'])} tabular PDFs..."
+            )
+            tabular_df = self.tabular_extractor.process_files(
+                categorized_pdfs["tabular"]
+            )
+            if not tabular_df.empty:
+                all_records.extend(tabular_df.to_dict("records"))
+                logger.info(f"Extracted {len(tabular_df)} tabular records")
+
         # Handle unknown format PDFs
         if categorized_pdfs["unknown"]:
             logger.warning(
@@ -175,6 +227,7 @@ class DEIUnifiedExtractor(LoggerMixin):
         logger.info(f"v2018 files: {self.format_stats['v2018']}")
         logger.info(f"Modern files: {self.format_stats['modern']}")
         logger.info(f"Format_3 files: {self.format_stats['format_3']}")
+        logger.info(f"Tabular files: {self.format_stats['tabular']}")
         logger.info(f"Unknown format: {self.format_stats['unknown']}")
         logger.info(f"Total records extracted: {len(df)}")
 
@@ -370,6 +423,8 @@ class DEIUnifiedExtractor(LoggerMixin):
             f.write(f"Total files processed: {sum(self.format_stats.values())}\n")
             f.write(f"v2018 format: {self.format_stats['v2018']}\n")
             f.write(f"Modern format: {self.format_stats['modern']}\n")
+            f.write(f"Format_3 format: {self.format_stats['format_3']}\n")
+            f.write(f"Tabular format: {self.format_stats['tabular']}\n")
             f.write(f"Unknown format: {self.format_stats['unknown']}\n\n")
             f.write(f"Total records extracted: {len(df)}\n")
             if not df.empty and "layout" in df.columns:
@@ -505,7 +560,13 @@ class DEIUnifiedExtractor(LoggerMixin):
 
     def reset_statistics(self):
         """Reset format statistics."""
-        self.format_stats = {"v2018": 0, "modern": 0, "format_3": 0, "unknown": 0}
+        self.format_stats = {
+            "v2018": 0,
+            "modern": 0,
+            "format_3": 0,
+            "tabular": 0,
+            "unknown": 0,
+        }
 
     def add_merge_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add merge_key and ΑρΠαρχ_Αρίθμηση fields to the DataFrame."""
