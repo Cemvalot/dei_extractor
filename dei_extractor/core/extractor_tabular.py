@@ -309,6 +309,9 @@ class DEITabularExtractor(LoggerMixin):
             "61475136403",
         ]
 
+        # Track which supply numbers we've already found to avoid duplicates
+        found_supplies = set()
+
         for i, line in enumerate(lines):
             if i in found_lines:
                 continue
@@ -318,6 +321,10 @@ class DEITabularExtractor(LoggerMixin):
                 if supply in line and re.search(
                     r"\d{9,12}", line
                 ):  # Has account number too
+                    # Skip if we've already found this supply number
+                    if supply in found_supplies:
+                        continue
+
                     # Found a missed record - try to extract it
                     if i + 2 < len(lines) and i not in found_lines:
                         line1 = self.normalize_line(lines[i])
@@ -334,6 +341,7 @@ class DEITabularExtractor(LoggerMixin):
                             if re.search(r"\d{2,5}", line3):
                                 blocks.append([line1, line2, line3])
                                 found_lines.update([i, i + 1, i + 2])
+                                found_supplies.add(supply)  # Mark this supply as found
                                 logger.info(
                                     f"Manual recovery: Found block for {supply} at line {i}"
                                 )
@@ -347,6 +355,31 @@ class DEITabularExtractor(LoggerMixin):
 
     def parse_row1(self, line: str) -> Optional[Dict]:
         """Parse ROW1 containing account and customer information."""
+
+        # City normalization map for OCR variations
+        CITY_MAP = {
+            "YMHTTOS": "ΥΜΗΤΤΟΣ",
+            "YMHTTOY": "ΥΜΗΤΤΟΥ",
+            "YMHTTOL": "ΥΜΗΤΤΟΥ",
+            "YMHTOL": "ΥΜΗΤΤΟΥ",
+            "YMHTTOE": "ΥΜΗΤΤΟΣ",
+            "ΥΜΗΤΟΣ": "ΥΜΗΤΤΟΣ",
+            "ΔΑΦΝΗΣ": "ΔΑΦΝΗΣ",
+            "ΔΑΦΝΗ": "ΔΑΦΝΗ",
+        }
+
+        def normalize_city(text: str) -> Optional[str]:
+            """Extract and normalize city name from text."""
+            city_regex = re.compile(
+                r"(ΥΜΗΤΤΟΣ|ΥΜΗΤΤΟΥ|ΔΑΦΝΗ|ΔΑΦΝΗΣ|YMHTTOS|YMHTTOY|YMHTTOL|YMHTOL|YMHTTOE)\b",
+                re.I,
+            )
+            match = city_regex.search(text or "")
+            if not match:
+                return None
+            city = match.group(1).upper()
+            return CITY_MAP.get(city, city)
+
         match = TABULAR_ROW1_PATTERN.match(line)
         if not match:
             # Fallback: Try flexible pattern for manual recovery cases
@@ -383,6 +416,12 @@ class DEITabularExtractor(LoggerMixin):
         # Parse rest of line for name, address, city
         # This is challenging with OCR - split by multiple spaces or common delimiters
         name, address, city = self._parse_rest_fields(rest)
+
+        # Fallback: If city is missing or empty, try to extract from rest
+        if not city or city.strip() in ("None", ""):
+            fallback_city = normalize_city(rest)
+            if fallback_city:
+                city = fallback_city
 
         return {
             "ΑρΠαροχής": str(supply_num),
