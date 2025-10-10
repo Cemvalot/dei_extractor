@@ -770,7 +770,7 @@ class DEITabularExtractor(LoggerMixin):
             "ΚατηγορίαΤιμολογίου": None,
             "Υποκατηγορία": None,
             "Εκαθαριστικός": False,
-            "source_file": source,
+            "source_file": source.replace("\\", "/") if source else None,
             "ΠερίοδοςΚατανάλωσης_Αρχική": None,
             "ΠερίοδοςΚατανάλωσης_Τελική": None,
             "raw_code": None,

@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+import sys
 import threading
 import time
 from pathlib import Path
@@ -11,15 +12,18 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from models.responses import HealthResponse
-from routers.jobs import router as jobs_router
-from routers.transform import router as transform_router
-from services.extractor_service import ExtractorService
-from services.language_service import LanguageService
 
-# Configure logging
+from .models.responses import HealthResponse
+from .routers.jobs import router as jobs_router
+from .routers.transform import router as transform_router
+from .services.extractor_service import ExtractorService
+from .services.language_service import LanguageService
+
+# Configure logging with UTF-8 encoding
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 

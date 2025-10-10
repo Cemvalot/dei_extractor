@@ -520,7 +520,7 @@ class DEIUnifiedExtractor(LoggerMixin):
             "ΚατηγορίαΤιμολογίου": payload.get("tariff_category"),
             "Υποκατηγορία": payload.get("tariff_subcategory"),
             "Εκαθαριστικός": payload.get("is_clearing", False),
-            "source_file": source_file,
+            "source_file": source_file.replace("\\", "/") if source_file else None,
             "ΠερίοδοςΚατανάλωσης_Αρχική": payload.get("period_from"),
             "ΠερίοδοςΚατανάλωσης_Τελική": payload.get("period_to"),
             "raw_code": payload.get("account_number")

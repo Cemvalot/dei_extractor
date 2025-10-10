@@ -116,7 +116,9 @@ def process_pdfs(input_dir: str, output_dir: Path, config: Dict[str, Any]) -> bo
 
     # Use the extractor's process_files method
     try:
-        df = extractor.process_files([str(pdf_file) for pdf_file in pdf_files])
+        # Normalize file paths for cross-platform compatibility
+        normalized_paths = [str(pdf_file).replace("\\", "/") for pdf_file in pdf_files]
+        df = extractor.process_files(normalized_paths)
         if not df.empty:
             # Write outputs to the specified output directory
             extractor.write_outputs(df, str(output_dir))

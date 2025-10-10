@@ -211,7 +211,13 @@ class DEIModernExtractor(LoggerMixin):
                 images[0], lang="ell+eng", config="--psm 6"
             )
 
-            return text.split("\n")
+            # Normalize OCR text for better pattern matching
+            from .utils.ocr_normalizer import preprocess_ocr_lines
+
+            lines = text.split("\n")
+            lines = preprocess_ocr_lines(lines)
+
+            return lines
 
         except Exception as e:
             logger.error(f"OCR failed for page {page_num + 1}: {e}")
@@ -501,7 +507,7 @@ class DEIModernExtractor(LoggerMixin):
             "needs_review": False,
             "reason": None,
             "confidence": confidence,
-            "source_file": source,
+            "source_file": source.replace("\\", "/") if source else None,
             "layout": "modern",
         }
 

@@ -10,11 +10,12 @@ from typing import List
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from models.requests import ProcessingOptions
-from models.responses import ErrorResponse, JobStatus
-from services.extractor_service import ExtractorService
-from services.storage import StorageService
-from services.zipping import ZippingService
+
+from ..models.requests import ProcessingOptions
+from ..models.responses import ErrorResponse, JobStatus
+from ..services.extractor_service import ExtractorService
+from ..services.storage import StorageService
+from ..services.zipping import ZippingService
 
 logger = logging.getLogger(__name__)
 

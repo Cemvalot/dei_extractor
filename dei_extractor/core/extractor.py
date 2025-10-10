@@ -289,7 +289,13 @@ class DEIExtractorEnhanced(LoggerMixin):
                 images[0], lang="ell+eng", config="--psm 6"
             )
 
-            return text.split("\n")
+            # Normalize OCR text for better pattern matching
+            from .utils.ocr_normalizer import preprocess_ocr_lines
+
+            lines = text.split("\n")
+            lines = preprocess_ocr_lines(lines)
+
+            return lines
 
         except Exception as e:
             logger.error(f"OCR failed for page {page_num + 1}: {e}")
@@ -858,7 +864,8 @@ class DEIExtractorEnhanced(LoggerMixin):
 
                 record = self.parse_v2018(raw_text)
                 if record and record.get("ΑρΠαροχής"):
-                    record["source_file"] = pdf_path
+                    # Normalize path separators for cross-platform compatibility
+                    record["source_file"] = pdf_path.replace("\\", "/")
                     record["confidence"] = 1.0  # High confidence for v2018
                     record["needs_review"] = False
                     return [record]

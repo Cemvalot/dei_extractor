@@ -3,6 +3,8 @@ Final 2023 transformation module for converting Phase-1 output to final dataset 
 
 This module handles the conversion from the filtered Phase-1 Excel file to the final
 ΠΑΡΟΧΕΣ 2023 format with proper grouping, calculations, and classification.
+
+Also includes transform_consumptions function for DEI invoice field selection based on date differences.
 """
 
 import logging
@@ -878,3 +880,402 @@ def _create_metadata_sheet(workbook, year: int = 2023):
     metadata_ws.set_column(0, 0, 30)  # Column name
     metadata_ws.set_column(1, 1, 50)  # Description
     metadata_ws.set_column(2, 2, 60)  # Formula/Notes
+
+
+def transform_consumptions(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Transform DEI invoice data to show previous and latest measurements per consumption period.
+
+    Business Logic:
+    - Group data by consumption period (ΠερίοδοςΚατανάλωσης_Αρχή)
+    - For each period, show all accounts with their previous and latest measurements
+    - Calculate days_diff = ΗμΈκδοσης - ΠερίοδοςΚατανάλωσης_Αρχή for reference
+
+    Args:
+        df: Input DataFrame with DEI invoice data (Greek column headers)
+
+    Returns:
+        Transformed DataFrame grouped by consumption period with all measurements
+    """
+    logger.info(f"Starting transform_consumptions with {len(df)} records")
+
+    # Create a copy to avoid modifying the original
+    result_df = df.copy()
+
+    # Parse dates with robust Greek date handling
+    result_df = _parse_greek_dates(result_df)
+
+    # Calculate days_diff
+    result_df["days_diff"] = _calculate_days_diff(result_df)
+
+    # Apply fallback column mapping for alternative column names
+    result_df = _apply_fallback_mapping(result_df)
+
+    # Group by consumption period and create summary
+    grouped_data = []
+
+    for period_start, group in result_df.groupby("ΠερίοδοςΚατανάλωσης_Αρχή"):
+        if pd.isna(period_start):
+            continue
+
+        # Get period end (should be the same for all records in the group)
+        period_end = (
+            group["ΠερίοδοςΚατανάλωσης_Τέλος"].iloc[0]
+            if "ΠερίοδοςΚατανάλωσης_Τέλος" in group.columns
+            else period_start
+        )
+
+        # Count accounts in this period
+        accounts_count = len(group)
+
+        # Get all measurements for this period
+        measurements = []
+        for _, row in group.iterrows():
+            measurement = {
+                "Περίοδος_Αρχή": period_start,
+                "Περίοδος_Τέλος": period_end,
+                "ΑρΠαροχής": row.get("ΑρΠαροχής", ""),
+                "ΑρΛογαριασμού": row.get("ΑρΛογαριασμού", ""),
+                "ΗμΈκδοσης": row.get("ΗμΈκδοσης", ""),
+                "Ονοματεπώνυμο_Διεύθυνση": row.get("Ονοματεπώνυμο_Διεύθυνση", ""),
+                "Πόλη": row.get("Πόλη", ""),
+                "days_diff": row.get("days_diff", np.nan),
+                "Προηγούμενη_Μέτρηση": row.get(
+                    "Προηγούμενη", row.get("Κατανάλωση_Προηγούμενη", np.nan)
+                ),
+                "Τελευταία_Μέτρηση": row.get(
+                    "Τελευταία", row.get("Κατανάλωση_Τελευταία", np.nan)
+                ),
+                "Συνολική_Κατανάλωση": row.get(
+                    "ΣυνΩΧΒ", row.get("ΣΩΧΒ", row.get("Κατανάλωση_Σύνολο", np.nan))
+                ),
+                "Κατηγορία_Τιμολογίου": row.get("ΚατηγορίαΤιμολογίου", ""),
+                "Εκαθαριστικός": row.get("Εκαθαριστικός", ""),
+            }
+            measurements.append(measurement)
+
+        # Add period summary
+        period_summary = {
+            "Περίοδος_Αρχή": period_start,
+            "Περίοδος_Τέλος": period_end,
+            "ΑρΠαροχής": f"ΣΥΝΟΛΟ ΠΕΡΙΟΔΟΥ ({accounts_count} λογαριασμοί)",
+            "ΑρΛογαριασμού": "",
+            "ΗμΈκδοσης": "",
+            "Ονοματεπώνυμο_Διεύθυνση": "",
+            "Πόλη": "",
+            "days_diff": "",
+            "Προηγούμενη_Μέτρηση": group["Προηγούμενη"].sum()
+            if "Προηγούμενη" in group.columns
+            else group.get("Κατανάλωση_Προηγούμενη", pd.Series([0])).sum(),
+            "Τελευταία_Μέτρηση": group["Τελευταία"].sum()
+            if "Τελευταία" in group.columns
+            else group.get("Κατανάλωση_Τελευταία", pd.Series([0])).sum(),
+            "Συνολική_Κατανάλωση": group["ΣυνΩΧΒ"].sum()
+            if "ΣυνΩΧΒ" in group.columns
+            else group.get(
+                "ΣΩΧΒ", group.get("Κατανάλωση_Σύνολο", pd.Series([0]))
+            ).sum(),
+            "Κατηγορία_Τιμολογίου": "",
+            "Εκαθαριστικός": "",
+        }
+
+        # Add measurements and summary to grouped data
+        grouped_data.extend(measurements)
+        grouped_data.append(period_summary)
+        grouped_data.append({})  # Empty row for separation
+
+    # Create final DataFrame
+    final_df = pd.DataFrame(grouped_data)
+
+    # Replace NaN values with empty strings for better Excel compatibility
+    final_df = final_df.fillna("")
+
+    # Format dates as dd/mm/yyyy strings
+    final_df = _format_output_dates(final_df)
+
+    logger.info(f"Transform completed. Output shape: {final_df.shape}")
+    return final_df
+
+
+def _parse_greek_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """Parse Greek dates with robust error handling."""
+
+    # Map actual column names to expected names
+    column_mapping = {
+        "ΠερίοδοςΚατανάλωσης_Αρχική": "ΠερίοδοςΚατανάλωσης_Αρχή",
+        "ΠερίοδοςΚατανάλωσης_Τελική": "ΠερίοδοςΚατανάλωσης_Τέλος",
+    }
+
+    # Apply column mapping
+    for old_name, new_name in column_mapping.items():
+        if old_name in df.columns and new_name not in df.columns:
+            df[new_name] = df[old_name]
+
+    # Handle each date column with its specific format
+    if "ΗμΈκδοσης" in df.columns:
+        # ΗμΈκδοσης typically uses dd/mm/yyyy format
+        df["ΗμΈκδοσης"] = pd.to_datetime(
+            df["ΗμΈκδοσης"], dayfirst=True, errors="coerce", format="%d/%m/%Y"
+        )
+        invalid_dates = df["ΗμΈκδοσης"].isna().sum()
+        if invalid_dates > 0:
+            logger.warning(f"Found {invalid_dates} invalid dates in column ΗμΈκδοσης")
+
+    if "ΠερίοδοςΚατανάλωσης_Αρχή" in df.columns:
+        # ΠερίοδοςΚατανάλωσης_Αρχή typically uses dd.mm.yyyy format
+        df["ΠερίοδοςΚατανάλωσης_Αρχή"] = pd.to_datetime(
+            df["ΠερίοδοςΚατανάλωσης_Αρχή"],
+            dayfirst=True,
+            errors="coerce",
+            format="%d.%m.%Y",
+        )
+        invalid_dates = df["ΠερίοδοςΚατανάλωσης_Αρχή"].isna().sum()
+        if invalid_dates > 0:
+            logger.warning(
+                f"Found {invalid_dates} invalid dates in column ΠερίοδοςΚατανάλωσης_Αρχή"
+            )
+
+    if "ΠερίοδοςΚατανάλωσης_Τέλος" in df.columns:
+        # ΠερίοδοςΚατανάλωσης_Τέλος typically uses dd.mm.yyyy format
+        df["ΠερίοδοςΚατανάλωσης_Τέλος"] = pd.to_datetime(
+            df["ΠερίοδοςΚατανάλωσης_Τέλος"],
+            dayfirst=True,
+            errors="coerce",
+            format="%d.%m.%Y",
+        )
+        invalid_dates = df["ΠερίοδοςΚατανάλωσης_Τέλος"].isna().sum()
+        if invalid_dates > 0:
+            logger.warning(
+                f"Found {invalid_dates} invalid dates in column ΠερίοδοςΚατανάλωσης_Τέλος"
+            )
+
+    return df
+
+
+def _calculate_days_diff(df: pd.DataFrame) -> pd.Series:
+    """Calculate days difference between issue date and consumption period start."""
+
+    # Check if required date columns exist
+    if "ΗμΈκδοσης" not in df.columns or "ΠερίοδοςΚατανάλωσης_Αρχή" not in df.columns:
+        logger.warning("Missing required date columns for days_diff calculation")
+        return pd.Series([np.nan] * len(df), index=df.index)
+
+    # Calculate difference in days
+    days_diff = (df["ΗμΈκδοσης"] - df["ΠερίοδοςΚατανάλωσης_Αρχή"]).dt.days
+
+    return days_diff
+
+
+def _apply_fallback_mapping(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply fallback mapping for alternative column names."""
+
+    # Define fallback mappings
+    fallback_mappings = {
+        "Κατανάλωση_Τελευταία": ["Τελευταία"],
+        "Κατανάλωση_Προηγούμενη": ["Προηγούμενη"],
+        "Κατανάλωση_Σύνολο": ["ΣυνΩΧΒ", "ΣΩΧΒ"],
+        "Κατανάλωση_Αρχική": ["Κατανάλωση_Αρχική"],  # Keep original if exists
+        "Λογαριασμός_Αρχική": ["Λογαριασμός_Αρχική"],  # Keep original if exists
+        "Λογαριασμός_Αρχική_Προηγούμενη": [
+            "Λογαριασμός_Αρχική_Προηγούμενη"
+        ],  # Keep original if exists
+    }
+
+    # Apply fallback mappings
+    for target_col, fallback_cols in fallback_mappings.items():
+        if target_col not in df.columns:
+            for fallback_col in fallback_cols:
+                if fallback_col in df.columns:
+                    df[target_col] = df[fallback_col]
+                    logger.info(f"Mapped {fallback_col} to {target_col}")
+                    break
+
+    return df
+
+
+def _create_output_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Create output columns based on date difference logic."""
+
+    # Initialize all output columns with NaN
+    df["ΑρχικήΚατανάλωση"] = np.nan
+    df["ΠροηγούμενηΚατανάλωση"] = np.nan
+    df["ΑρχικήΛογαριασμού"] = np.nan
+    df["ΑρχικήΠροηγούμενηΛογαριασμού"] = np.nan
+    df["ΤελευταίαΚατανάλωση"] = np.nan
+    df["ΣυνολικήΚατανάλωση"] = np.nan
+
+    # Create mask for records where days_diff > 60
+    high_diff_mask = df["days_diff"].abs() > 60
+
+    # Create mask for records where days_diff <= 60 (including exactly 60)
+    low_diff_mask = df["days_diff"].abs() <= 60
+
+    # Apply logic for high difference (> 60 days) - use initial/previous values
+    if high_diff_mask.any():
+        # Map initial/previous consumption values
+        if "Κατανάλωση_Αρχική" in df.columns:
+            df.loc[high_diff_mask, "ΑρχικήΚατανάλωση"] = df.loc[
+                high_diff_mask, "Κατανάλωση_Αρχική"
+            ]
+
+        if "Κατανάλωση_Προηγούμενη" in df.columns:
+            df.loc[high_diff_mask, "ΠροηγούμενηΚατανάλωση"] = df.loc[
+                high_diff_mask, "Κατανάλωση_Προηγούμενη"
+            ]
+
+        # Map initial/previous account values
+        if "Λογαριασμός_Αρχική" in df.columns:
+            df.loc[high_diff_mask, "ΑρχικήΛογαριασμού"] = df.loc[
+                high_diff_mask, "Λογαριασμός_Αρχική"
+            ]
+
+        if "Λογαριασμός_Αρχική_Προηγούμενη" in df.columns:
+            df.loc[high_diff_mask, "ΑρχικήΠροηγούμενηΛογαριασμού"] = df.loc[
+                high_diff_mask, "Λογαριασμός_Αρχική_Προηγούμενη"
+            ]
+
+    # Apply logic for low difference (<= 60 days) - use latest/total values
+    if low_diff_mask.any():
+        # Map latest/total consumption values
+        if "Κατανάλωση_Τελευταία" in df.columns:
+            df.loc[low_diff_mask, "ΤελευταίαΚατανάλωση"] = df.loc[
+                low_diff_mask, "Κατανάλωση_Τελευταία"
+            ]
+
+        if "Κατανάλωση_Σύνολο" in df.columns:
+            df.loc[low_diff_mask, "ΣυνολικήΚατανάλωση"] = df.loc[
+                low_diff_mask, "Κατανάλωση_Σύνολο"
+            ]
+
+    return df
+
+
+def _format_output_dates(df: pd.DataFrame) -> pd.DataFrame:
+    """Format date columns as dd/mm/yyyy strings."""
+
+    date_columns = [
+        "ΗμΈκδοσης",
+        "ΠερίοδοςΚατανάλωσης_Αρχή",
+        "ΠερίοδοςΚατανάλωσης_Τέλος",
+        "Περίοδος_Αρχή",
+        "Περίοδος_Τέλος",
+    ]
+
+    for col in date_columns:
+        if col in df.columns:
+            # Convert to datetime if not already
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+            # Format as dd/mm/yyyy string
+            df[col] = df[col].dt.strftime("%d/%m/%Y")
+            # Replace 'NaT' with empty string for missing dates
+            df[col] = df[col].replace("NaT", "")
+
+    return df
+
+
+def save_transform_consumptions(
+    df: pd.DataFrame, output_path: str = "./output/transform_consumptions.xlsx"
+):
+    """
+    Save transformed consumption data to Excel file with enhanced formatting.
+
+    Args:
+        df: Transformed DataFrame
+        output_path: Output file path
+    """
+    # Ensure output directory exists
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Replace any remaining NaN values with empty strings
+    df = df.fillna("")
+
+    # Save to Excel with proper formatting
+    with pd.ExcelWriter(output_path, engine="xlsxwriter") as writer:
+        df.to_excel(writer, sheet_name="Μετρήσεις_Ανά_Περίοδο", index=False)
+
+        # Get workbook and worksheet for formatting
+        workbook = writer.book
+        worksheet = writer.sheets["Μετρήσεις_Ανά_Περίοδο"]
+
+        # Define formats
+        header_format = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "top",
+                "border": 1,
+                "bg_color": "#D3D3D3",
+            }
+        )
+
+        summary_format = workbook.add_format(
+            {"bold": True, "bg_color": "#FFFF99", "border": 1}
+        )
+
+        number_format = workbook.add_format({"num_format": "0.00"})
+        date_format = workbook.add_format({"num_format": "dd/mm/yyyy"})
+
+        # Apply header format
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+
+        # Apply special formatting to data rows
+        for row_num in range(1, len(df) + 1):
+            # Check if this is a summary row
+            if "ΣΥΝΟΛΟ ΠΕΡΙΟΔΟΥ" in str(df.iloc[row_num - 1].get("ΑρΠαροχής", "")):
+                # Apply summary formatting to the entire row
+                for col_num in range(len(df.columns)):
+                    value = df.iloc[row_num - 1].iloc[col_num]
+                    worksheet.write(row_num, col_num, value, summary_format)
+            else:
+                # Apply normal formatting
+                for col_num, column in enumerate(df.columns):
+                    value = df.iloc[row_num - 1].iloc[col_num]
+
+                    # Apply number formatting to numeric columns
+                    if column in [
+                        "Προηγούμενη_Μέτρηση",
+                        "Τελευταία_Μέτρηση",
+                        "Συνολική_Κατανάλωση",
+                        "days_diff",
+                    ]:
+                        if (
+                            value != ""
+                            and str(value).replace(".", "").replace("-", "").isdigit()
+                        ):
+                            worksheet.write(
+                                row_num, col_num, float(value), number_format
+                            )
+                        else:
+                            worksheet.write(row_num, col_num, value)
+                    # Apply date formatting to date columns
+                    elif column in ["Περίοδος_Αρχή", "Περίοδος_Τέλος", "ΗμΈκδοσης"]:
+                        worksheet.write(row_num, col_num, value, date_format)
+                    else:
+                        worksheet.write(row_num, col_num, value)
+
+        # Freeze top row
+        worksheet.freeze_panes(1, 0)
+
+        # Set column widths
+        column_widths = {
+            "Περίοδος_Αρχή": 12,
+            "Περίοδος_Τέλος": 12,
+            "ΑρΠαροχής": 15,
+            "ΑρΛογαριασμού": 15,
+            "ΗμΈκδοσης": 12,
+            "Ονοματεπώνυμο_Διεύθυνση": 30,
+            "Πόλη": 15,
+            "days_diff": 10,
+            "Προηγούμενη_Μέτρηση": 15,
+            "Τελευταία_Μέτρηση": 15,
+            "Συνολική_Κατανάλωση": 15,
+            "Κατηγορία_Τιμολογίου": 20,
+            "Εκαθαριστικός": 12,
+        }
+
+        for col_num, column in enumerate(df.columns):
+            width = column_widths.get(column, 15)
+            worksheet.set_column(col_num, col_num, width)
+
+    logger.info(f"Saved transformed data to {output_path}")

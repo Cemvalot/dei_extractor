@@ -386,7 +386,8 @@ class DEIV2018Extractor(LoggerMixin):
         try:
             record = self.parse_v2018(text)
             if record and record.get("ΑρΠαροχής"):
-                record["source_file"] = pdf_path
+                # Normalize path separators for cross-platform compatibility
+                record["source_file"] = pdf_path.replace("\\", "/")
                 record["confidence"] = 1.0  # High confidence for v2018
                 record["needs_review"] = False
                 return [record]

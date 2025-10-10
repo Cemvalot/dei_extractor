@@ -3,6 +3,8 @@
 class DEIExtractorApp {
     constructor() {
         this.selectedFiles = [];
+        this.selectedTransformFile = null;
+        this.currentTab = 'extract';
         this.translations = {
             gr: {
                 noValidFiles: 'Δεν βρέθηκαν έγκυρα αρχεία. Παρακαλώ επιλέξτε αρχεία PDF ή ZIP.',
@@ -17,7 +19,12 @@ class DEIExtractorApp {
                 creatingZip: 'Δημιουργία αρχείου ZIP...',
                 validationFailed: 'Η επικύρωση απέτυχε',
                 processingFailedMsg: 'Η επεξεργασία απέτυχε',
-                errorDuringProcessing: 'Σφάλμα κατά την επεξεργασία'
+                errorDuringProcessing: 'Σφάλμα κατά την επεξεργασία',
+                noValidDataFile: 'Δεν βρέθηκε έγκυρο αρχείο δεδομένων. Παρακαλώ επιλέξτε αρχείο XLSX ή CSV.',
+                noDataFileSelected: 'Δεν επιλέχθηκε αρχείο δεδομένων',
+                transformFailed: 'Ο μετασχηματισμός απέτυχε',
+                transformCompleted: 'Ο μετασχηματισμός ολοκληρώθηκε επιτυχώς!',
+                transformingData: 'Μετασχηματισμός δεδομένων...'
             },
             en: {
                 noValidFiles: 'No valid files selected. Please select PDF or ZIP files.',
@@ -32,7 +39,12 @@ class DEIExtractorApp {
                 creatingZip: 'Creating ZIP file...',
                 validationFailed: 'Validation failed',
                 processingFailedMsg: 'Processing failed',
-                errorDuringProcessing: 'Error during processing'
+                errorDuringProcessing: 'Error during processing',
+                noValidDataFile: 'No valid data file selected. Please select XLSX or CSV file.',
+                noDataFileSelected: 'No data file selected',
+                transformFailed: 'Transform failed',
+                transformCompleted: 'Transform completed successfully!',
+                transformingData: 'Transforming data...'
             }
         };
         this.currentLanguage = 'gr'; // Default to Greek
