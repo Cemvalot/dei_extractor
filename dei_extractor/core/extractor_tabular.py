@@ -329,6 +329,10 @@ class DEITabularExtractor(LoggerMixin):
                                 logger.info(
                                     f"Manual recovery: Found block for {supply} at line {i}"
                                 )
+                                logger.debug(f"Manual recovery block content:")
+                                logger.debug(f"  ROW1: {line1}")
+                                logger.debug(f"  ROW2: {line2}")
+                                logger.debug(f"  ROW3: {line3}")
                                 break
 
         return blocks
@@ -873,10 +877,17 @@ class DEITabularExtractor(LoggerMixin):
         records = []
         for i, block in enumerate(blocks):
             try:
+                logger.debug(
+                    f"Parsing block {i+1}: {block[0][:50]}..."
+                )  # Log first 50 chars of ROW1
                 record = self.parse_block(block, pdf_path)
                 if record:
+                    logger.debug(
+                        f"Successfully parsed block {i+1}: ΑρΠαροχής={record.get('ΑρΠαροχής')}"
+                    )
                     records.append(record)
                 else:
+                    logger.warning(f"Block {i+1} parsing failed - no record returned")
                     self.warnings.append(f"Block {i+1} in {pdf_path}: Failed to parse")
             except Exception as e:
                 logger.error(f"Error parsing tabular block {i+1} in {pdf_path}: {e}")
