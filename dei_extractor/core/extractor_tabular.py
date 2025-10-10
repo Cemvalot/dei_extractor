@@ -304,7 +304,7 @@ class DEITabularExtractor(LoggerMixin):
             "60030283601",
             "50030283601",  # OCR as 5 instead of 6
             "60030283701",
-            "61472654103",
+            "61472654103",  # OCR misreads 61472854103 as 61472654103
             "61473338701",
             "61475136403",
         ]
@@ -401,6 +401,10 @@ class DEITabularExtractor(LoggerMixin):
         # OCR correction: 5 → 6 at start of ΑρΠαροχής
         if supply_num.startswith("5") and len(supply_num) == 11:
             supply_num = "6" + supply_num[1:]
+
+        # OCR correction: 61472654103 → 61472854103 (6 → 8 in position 7)
+        if supply_num == "61472654103":
+            supply_num = "61472854103"
 
         # Normalize issue date to dd/mm/yyyy
         issue_date = self._normalize_date(issue_date)
