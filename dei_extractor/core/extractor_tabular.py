@@ -74,6 +74,14 @@ TABULAR_ROW1_PATTERN = re.compile(
     r"(?P<rest>.+)$"  # Rest of the line (name, address, city)
 )
 
+# More flexible pattern for manual recovery cases
+TABULAR_ROW1_FLEXIBLE_PATTERN = re.compile(
+    r".*?(?P<par>[5-6]\d{9,10})\s+(?P<log>\d{9,12})\s+"  # ΑρΠαροχής starts with 5 or 6
+    r"(?P<issued>\d{1,3}[\/\-]?\d{0,3}[\/\-]?\d{2,8}[\/\d\s]*)\s+"  # Very flexible date with spaces
+    r"(?P<period>[iI\d\s\.\-]{10,30})\s+"  # Very flexible period
+    r"(?P<rest>.+)$"  # Rest of the line (name, address, city)
+)
+
 # ROW2: Category and label (may have extra text after label)
 # Very flexible for OCR errors: eon/e0n → ΦΟΠ, poerAdyio/Ttpodrdyio → Τιμολογιο
 TABULAR_ROW2_PATTERN = re.compile(
@@ -341,7 +349,10 @@ class DEITabularExtractor(LoggerMixin):
         """Parse ROW1 containing account and customer information."""
         match = TABULAR_ROW1_PATTERN.match(line)
         if not match:
-            return None
+            # Fallback: Try flexible pattern for manual recovery cases
+            match = TABULAR_ROW1_FLEXIBLE_PATTERN.match(line)
+            if not match:
+                return None
 
         # Extract basic fields
         supply_num = match.group("par")
