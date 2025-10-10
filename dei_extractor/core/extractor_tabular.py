@@ -160,17 +160,30 @@ class DEITabularExtractor(LoggerMixin):
             # Multi-pass OCR strategy for maximum record extraction
             # Try multiple DPI and PSM combinations, merge results
 
+            logger.info(f"Starting OCR for page {page_num + 1} in {pdf_path}")
+
             all_lines = []
             seen_lines = set()
 
             # Pass 1: DPI=200, PSM=6 (uniform block - good for dense tables)
-            images_200 = convert_from_path(
-                pdf_path, first_page=page_num + 1, last_page=page_num + 1, dpi=200
-            )
-            if images_200:
-                text1 = pytesseract.image_to_string(
-                    images_200[0], lang="ell+eng", config="--psm 6"
+            try:
+                images_200 = convert_from_path(
+                    pdf_path, first_page=page_num + 1, last_page=page_num + 1, dpi=200
                 )
+                logger.info(f"OCR Pass 1: Converted PDF to image with DPI=200")
+            except Exception as e:
+                logger.error(f"OCR Pass 1: PDF to image conversion failed: {e}")
+                images_200 = []
+
+            if images_200:
+                try:
+                    text1 = pytesseract.image_to_string(
+                        images_200[0], lang="ell+eng", config="--psm 6"
+                    )
+                    logger.info(f"OCR Pass 1: Extracted {len(text1.split())} words")
+                except Exception as e:
+                    logger.error(f"OCR Pass 1: Tesseract failed: {e}")
+                    text1 = ""
                 lines1 = text1.split("\n")
 
                 for line in lines1:
@@ -219,10 +232,26 @@ class DEITabularExtractor(LoggerMixin):
             logger.info(
                 f"Multi-pass OCR (3 passes) extracted {len(normalized)} unique lines"
             )
+
+            # If OCR extracted very little text, log warning
+            if len(normalized) < 10:
+                logger.warning(
+                    f"OCR extracted very little text ({len(normalized)} lines) - possible OCR failure"
+                )
+                logger.warning(
+                    "Check if Tesseract OCR and Greek language pack are installed"
+                )
+
             return normalized
 
         except Exception as e:
             logger.error(f"OCR failed for page {page_num + 1}: {e}")
+            logger.error(
+                "Make sure Tesseract OCR and Greek language pack are installed"
+            )
+            logger.error(
+                "On Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki"
+            )
             return []
 
     def normalize_line(self, line: str) -> str:
