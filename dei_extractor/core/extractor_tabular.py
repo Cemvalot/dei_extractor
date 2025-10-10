@@ -59,6 +59,10 @@ TABULAR_ANCHORS = [
     r"[ΚK][ΩQ][ΔD]\.?\s*[ΕE][ΤT][ΑA][ΙI][ΡP]",  # ΚΩΔ.ΕΤΑΙΡΟΥ
     r"[ΕE][ΞΞ][ΥY][ΠP][ΗH][ΡP][ΕE][ΤT].*[ΚK][ΑA][ΤT][ΑA][ΝN][ΑA][ΛL]",  # ΕΞΥΠΗΡΕΤΗΣΗ ΚΑΤΑΝΑΛΩΤΩΝ
     r"ΡΕΥΜΑΤ[ΟO]Σ\s+ΔΗΜΩΝ",  # Additional: ΡΕΥΜΑΤΟΣ ΔΗΜΩΝ
+    r"[6-6]\d{10}",  # Supply numbers starting with 6 (like 61472654103)
+    r"[5-5]\d{10}",  # Supply numbers starting with 5
+    r"ΔΗΜΟΣ.*ΥΜΗΤΤΟΥ",  # Common pattern in scanned PDFs
+    r"ΔΗΜΟΤΙΚΑ.*ΕΠΙΧΕΙΡΗΣΕΙΣ",  # Another common pattern
 ]
 
 # Tabular format patterns (more relaxed than modern 3-row)
