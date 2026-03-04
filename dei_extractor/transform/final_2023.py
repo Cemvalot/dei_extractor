@@ -13,8 +13,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
-import pandas as pd
+import numpy as np  # pyright: ignore[reportMissingImports]
+import pandas as pd  # pyright: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 
@@ -741,7 +741,10 @@ def write_final(
         numfmt_2dec = workbook.add_format({"num_format": "0.00"})
         numfmt_int = workbook.add_format({"num_format": "0"})
         for col_num, column in enumerate(df.columns):
-            max_length = max(df[column].astype(str).map(len).max(), len(str(column)))
+            # Use vectorized string length to avoid calling len() on non-string values
+            max_length = max(
+                df[column].astype(str).str.len().max(), len(str(column))
+            )
             if pd.api.types.is_numeric_dtype(df[column]):
                 # Check if column has decimal values to determine format
                 has_decimals = (

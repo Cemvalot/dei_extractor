@@ -29,10 +29,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import pandas as pd
-import pdfplumber
-import pytesseract
-from pdf2image import convert_from_path
+import pandas as pd  # pyright: ignore[reportMissingImports]
+import pdfplumber  # pyright: ignore[reportMissingImports]
+import pytesseract  # pyright: ignore[reportMissingImports]
+from pdf2image import convert_from_path  # pyright: ignore[reportMissingImports]
 
 from ..utils.config import Config
 from ..utils.logger import LoggerMixin
@@ -59,10 +59,6 @@ TABULAR_ANCHORS = [
     r"[ΚK][ΩQ][ΔD]\.?\s*[ΕE][ΤT][ΑA][ΙI][ΡP]",  # ΚΩΔ.ΕΤΑΙΡΟΥ
     r"[ΕE][ΞΞ][ΥY][ΠP][ΗH][ΡP][ΕE][ΤT].*[ΚK][ΑA][ΤT][ΑA][ΝN][ΑA][ΛL]",  # ΕΞΥΠΗΡΕΤΗΣΗ ΚΑΤΑΝΑΛΩΤΩΝ
     r"ΡΕΥΜΑΤ[ΟO]Σ\s+ΔΗΜΩΝ",  # Additional: ΡΕΥΜΑΤΟΣ ΔΗΜΩΝ
-    r"[6-6]\d{10}",  # Supply numbers starting with 6 (like 61472654103)
-    r"[5-5]\d{10}",  # Supply numbers starting with 5
-    r"ΔΗΜΟΣ.*ΥΜΗΤΤΟΥ",  # Common pattern in scanned PDFs
-    r"ΔΗΜΟΤΙΚΑ.*ΕΠΙΧΕΙΡΗΣΕΙΣ",  # Another common pattern
 ]
 
 # Tabular format patterns (more relaxed than modern 3-row)
@@ -71,14 +67,6 @@ TABULAR_ROW1_PATTERN = re.compile(
     r".*?(?P<par>[5-6]\d{9,10})\s+(?P<log>\d{9,12})\s+"  # ΑρΠαροχής starts with 5 or 6
     r"(?P<issued>\d{1,3}[\/\-]?\d{0,3}[\/\-]?\d{2,8}[\/\d]*)\s+"  # Very flexible date (slashes optional)
     r"(?P<period>[iI\d]{2}[-\.]\s*\d{2}[-\.]\s*[\dTI]{4,6}\s*-\s*\d{2}[-\.]\s*\d{2}[-\.]\s*\d{4,6})\s+"  # Period (allows spaces, iI, extra digits)
-    r"(?P<rest>.+)$"  # Rest of the line (name, address, city)
-)
-
-# More flexible pattern for manual recovery cases
-TABULAR_ROW1_FLEXIBLE_PATTERN = re.compile(
-    r".*?(?P<par>[5-6]\d{9,10})\s+(?P<log>\d{9,12})\s+"  # ΑρΠαροχής starts with 5 or 6
-    r"(?P<issued>\d{1,3}[\/\-]?\d{0,3}[\/\-]?\d{2,8}[\/\d\s]*)\s+"  # Very flexible date with spaces
-    r"(?P<period>[iI\d\s\.\-]{10,30})\s+"  # Very flexible period
     r"(?P<rest>.+)$"  # Rest of the line (name, address, city)
 )
 
@@ -168,30 +156,17 @@ class DEITabularExtractor(LoggerMixin):
             # Multi-pass OCR strategy for maximum record extraction
             # Try multiple DPI and PSM combinations, merge results
 
-            logger.info(f"Starting OCR for page {page_num + 1} in {pdf_path}")
-
             all_lines = []
             seen_lines = set()
 
             # Pass 1: DPI=200, PSM=6 (uniform block - good for dense tables)
-            try:
-                images_200 = convert_from_path(
-                    pdf_path, first_page=page_num + 1, last_page=page_num + 1, dpi=200
-                )
-                logger.info(f"OCR Pass 1: Converted PDF to image with DPI=200")
-            except Exception as e:
-                logger.error(f"OCR Pass 1: PDF to image conversion failed: {e}")
-                images_200 = []
-
+            images_200 = convert_from_path(
+                pdf_path, first_page=page_num + 1, last_page=page_num + 1, dpi=200
+            )
             if images_200:
-                try:
-                    text1 = pytesseract.image_to_string(
-                        images_200[0], lang="ell+eng", config="--psm 6"
-                    )
-                    logger.info(f"OCR Pass 1: Extracted {len(text1.split())} words")
-                except Exception as e:
-                    logger.error(f"OCR Pass 1: Tesseract failed: {e}")
-                    text1 = ""
+                text1 = pytesseract.image_to_string(
+                    images_200[0], lang="ell+eng", config="--psm 6"
+                )
                 lines1 = text1.split("\n")
 
                 for line in lines1:
@@ -240,26 +215,10 @@ class DEITabularExtractor(LoggerMixin):
             logger.info(
                 f"Multi-pass OCR (3 passes) extracted {len(normalized)} unique lines"
             )
-
-            # If OCR extracted very little text, log warning
-            if len(normalized) < 10:
-                logger.warning(
-                    f"OCR extracted very little text ({len(normalized)} lines) - possible OCR failure"
-                )
-                logger.warning(
-                    "Check if Tesseract OCR and Greek language pack are installed"
-                )
-
             return normalized
 
         except Exception as e:
             logger.error(f"OCR failed for page {page_num + 1}: {e}")
-            logger.error(
-                "Make sure Tesseract OCR and Greek language pack are installed"
-            )
-            logger.error(
-                "On Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki"
-            )
             return []
 
     def normalize_line(self, line: str) -> str:
@@ -304,13 +263,10 @@ class DEITabularExtractor(LoggerMixin):
             "60030283601",
             "50030283601",  # OCR as 5 instead of 6
             "60030283701",
-            "61472654103",  # OCR misreads 61472854103 as 61472654103
+            "61472654103",
             "61473338701",
             "61475136403",
         ]
-
-        # Track which supply numbers we've already found to avoid duplicates
-        found_supplies = set()
 
         for i, line in enumerate(lines):
             if i in found_lines:
@@ -321,10 +277,6 @@ class DEITabularExtractor(LoggerMixin):
                 if supply in line and re.search(
                     r"\d{9,12}", line
                 ):  # Has account number too
-                    # Skip if we've already found this supply number
-                    if supply in found_supplies:
-                        continue
-
                     # Found a missed record - try to extract it
                     if i + 2 < len(lines) and i not in found_lines:
                         line1 = self.normalize_line(lines[i])
@@ -341,51 +293,18 @@ class DEITabularExtractor(LoggerMixin):
                             if re.search(r"\d{2,5}", line3):
                                 blocks.append([line1, line2, line3])
                                 found_lines.update([i, i + 1, i + 2])
-                                found_supplies.add(supply)  # Mark this supply as found
                                 logger.info(
                                     f"Manual recovery: Found block for {supply} at line {i}"
                                 )
-                                logger.debug(f"Manual recovery block content:")
-                                logger.debug(f"  ROW1: {line1}")
-                                logger.debug(f"  ROW2: {line2}")
-                                logger.debug(f"  ROW3: {line3}")
                                 break
 
         return blocks
 
     def parse_row1(self, line: str) -> Optional[Dict]:
         """Parse ROW1 containing account and customer information."""
-
-        # City normalization map for OCR variations
-        CITY_MAP = {
-            "YMHTTOS": "ΥΜΗΤΤΟΣ",
-            "YMHTTOY": "ΥΜΗΤΤΟΥ",
-            "YMHTTOL": "ΥΜΗΤΤΟΥ",
-            "YMHTOL": "ΥΜΗΤΤΟΥ",
-            "YMHTTOE": "ΥΜΗΤΤΟΣ",
-            "ΥΜΗΤΟΣ": "ΥΜΗΤΤΟΣ",
-            "ΔΑΦΝΗΣ": "ΔΑΦΝΗΣ",
-            "ΔΑΦΝΗ": "ΔΑΦΝΗ",
-        }
-
-        def normalize_city(text: str) -> Optional[str]:
-            """Extract and normalize city name from text."""
-            city_regex = re.compile(
-                r"(ΥΜΗΤΤΟΣ|ΥΜΗΤΤΟΥ|ΔΑΦΝΗ|ΔΑΦΝΗΣ|YMHTTOS|YMHTTOY|YMHTTOL|YMHTOL|YMHTTOE)\b",
-                re.I,
-            )
-            match = city_regex.search(text or "")
-            if not match:
-                return None
-            city = match.group(1).upper()
-            return CITY_MAP.get(city, city)
-
         match = TABULAR_ROW1_PATTERN.match(line)
         if not match:
-            # Fallback: Try flexible pattern for manual recovery cases
-            match = TABULAR_ROW1_FLEXIBLE_PATTERN.match(line)
-            if not match:
-                return None
+            return None
 
         # Extract basic fields
         supply_num = match.group("par")
@@ -402,10 +321,6 @@ class DEITabularExtractor(LoggerMixin):
         if supply_num.startswith("5") and len(supply_num) == 11:
             supply_num = "6" + supply_num[1:]
 
-        # OCR correction: 61472654103 → 61472854103 (6 → 8 in position 7)
-        if supply_num == "61472654103":
-            supply_num = "61472854103"
-
         # Normalize issue date to dd/mm/yyyy
         issue_date = self._normalize_date(issue_date)
 
@@ -420,12 +335,6 @@ class DEITabularExtractor(LoggerMixin):
         # Parse rest of line for name, address, city
         # This is challenging with OCR - split by multiple spaces or common delimiters
         name, address, city = self._parse_rest_fields(rest)
-
-        # Fallback: If city is missing or empty, try to extract from rest
-        if not city or city.strip() in ("None", ""):
-            fallback_city = normalize_city(rest)
-            if fallback_city:
-                city = fallback_city
 
         return {
             "ΑρΠαροχής": str(supply_num),
@@ -861,7 +770,7 @@ class DEITabularExtractor(LoggerMixin):
             "ΚατηγορίαΤιμολογίου": None,
             "Υποκατηγορία": None,
             "Εκαθαριστικός": False,
-            "source_file": source.replace("\\", "/") if source else None,
+            "source_file": source,
             "ΠερίοδοςΚατανάλωσης_Αρχική": None,
             "ΠερίοδοςΚατανάλωσης_Τελική": None,
             "raw_code": None,
@@ -931,17 +840,10 @@ class DEITabularExtractor(LoggerMixin):
         records = []
         for i, block in enumerate(blocks):
             try:
-                logger.debug(
-                    f"Parsing block {i+1}: {block[0][:50]}..."
-                )  # Log first 50 chars of ROW1
                 record = self.parse_block(block, pdf_path)
                 if record:
-                    logger.debug(
-                        f"Successfully parsed block {i+1}: ΑρΠαροχής={record.get('ΑρΠαροχής')}"
-                    )
                     records.append(record)
                 else:
-                    logger.warning(f"Block {i+1} parsing failed - no record returned")
                     self.warnings.append(f"Block {i+1} in {pdf_path}: Failed to parse")
             except Exception as e:
                 logger.error(f"Error parsing tabular block {i+1} in {pdf_path}: {e}")
