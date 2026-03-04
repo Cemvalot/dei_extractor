@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ExtractorState, ProcessOptions, RunHistory, Language } from '@/lib/types';
+import { ExtractorState, ProcessOptions, RunHistoryItem, Language } from '@/lib/types';
 import { getCurrentLanguage, setLanguage } from '@/lib/i18n';
 
 interface ExtractorStore extends ExtractorState {
@@ -17,7 +17,7 @@ interface ExtractorStore extends ExtractorState {
   completeRun: () => void;
   errorRun: (error: string) => void;
   resetRun: () => void;
-  addToHistory: (run: RunHistory) => void;
+  addToHistory: (run: RunHistoryItem) => void;
   clearHistory: () => void;
 }
 
