@@ -5,10 +5,11 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'DEI Extractor',
-  description: 'Extract data from bills and invoices',
-  keywords: ['DEI', 'extractor', 'bills', 'invoices', 'data extraction'],
-  authors: [{ name: 'DEI Extractor Team' }],
+  title: 'Energy Data Transformation Engine (EDTE)',
+  description:
+    'Advanced system for automated extraction and structuring of data from energy bills and invoices.',
+  keywords: ['energy', 'EDTE', 'bills', 'invoices', 'data transformation'],
+  authors: [{ name: 'EDTE Team' }],
 };
 
 export const viewport = {

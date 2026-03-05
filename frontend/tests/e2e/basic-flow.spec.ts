@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('DEI Extractor Basic Flow', () => {
+test.describe('EDTE Basic Flow', () => {
   test('should load the homepage', async ({ page }) => {
     await page.goto('/');
 
     // Check if the main elements are present
-    await expect(page.getByText('DEI Extractor')).toBeVisible();
-    await expect(page.getByText('Extract data from bills')).toBeVisible();
+    await expect(
+      page.getByText('Energy Data Transformation Engine (EDTE)')
+    ).toBeVisible();
   });
 
   test('should toggle language', async ({ page }) => {
